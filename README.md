@@ -82,6 +82,14 @@ pip install "sage-audit[mcp]"
 pip install "sage-audit[all]"
 ```
 
+> **🚧 Not on PyPI yet?** Until the first PyPI release is cut (step-by-step runbook in
+> **[Distribution & Publishing](#-distribution--publishing)** below), install
+> straight from the repository:
+>
+> ```bash
+> pip install git+https://github.com/tmolavi/sage-audit.git
+> ```
+
 > **Zero-crash guarantee:** if no neural embedding package is installed (or a model download fails), the GEO pillar silently falls back to a deterministic hashed n-gram TF vectorizer. Results stay stable and reproducible — the tool *never* crashes.
 
 ## Quickstart (CLI)
@@ -231,6 +239,69 @@ pip install -e ".[dev]"
 pytest -q
 ```
 
+## 📦 Distribution & Publishing
+
+### Two "publish" targets — don't confuse them
+
+| Target | What it is | Status |
+| --- | --- | --- |
+| **GitHub** | Public source-code repository | ✅ **Published** — [github.com/tmolavi/sage-audit](https://github.com/tmolavi/sage-audit) |
+| **PyPI** | The `pip install sage-audit` package on pypi.org | ⏳ Pending one-time maintainer step (below) |
+
+> ⚠️ **Until the first PyPI release**, SAGE is installed directly from the repo:
+>
+> ```bash
+> pip install git+https://github.com/tmolavi/sage-audit.git
+> # with every optional extra (embeddings + mcp):
+> pip install "sage-audit[all] @ git+https://github.com/tmolavi/sage-audit.git"
+> ```
+
+### Path A — Manual PyPI publish (≈5 minutes)
+
+GitHub and PyPI are **separate services**: pushing code to GitHub never
+publishes a pip package. To put `sage-audit` on PyPI the maintainer must:
+
+1. **Create a PyPI account** at [pypi.org/account/register](https://pypi.org/account/register/),
+   verify the email address, and **enable two-factor authentication**
+   (PyPI refuses uploads from accounts without 2FA).
+2. **Mint an API token** at [pypi.org/manage/account/token](https://pypi.org/manage/account/token/)
+   → *Add API token*.
+   - The project does not exist on PyPI yet, so the **first token must be
+     scoped "Entire account"** — project-scoped tokens only become available
+     *after* the first upload.
+   - The token starts with `pypi-` — treat it like a password and never
+     commit it to git.
+3. **Build & upload** from the repo root:
+
+   ```bash
+   pip install --upgrade build twine
+   python -m build        # → dist/sage_audit-1.0.0-py3-none-any.whl + .tar.gz
+   twine upload dist/*    # username: __token__    password: pypi-...
+   ```
+
+4. **Verify** at [pypi.org/project/sage-audit](https://pypi.org/project/sage-audit/)
+   — from that moment `pip install sage-audit` works worldwide.
+5. **Hygiene** — revoke the token immediately after the upload
+   (or create a new *project-scoped* one and keep the expiry short).
+
+### Path B — Trusted Publishing (recommended, zero secrets)
+
+This repository already ships
+[`.github/workflows/publish.yml`](.github/workflows/publish.yml), which uses the
+official [`pypa/gh-action-pypi-publish`](https://github.com/pypa/gh-action-pypi-publish)
+action over GitHub OIDC — **no token is ever stored anywhere**.
+
+One-time setup (PyPI side):
+
+1. Go to [pypi.org/manage/account/publishing](https://pypi.org/manage/account/publishing/)
+   → **Add a new pending publisher** and enter:
+   - PyPI project name: `sage-audit`
+   - Owner: `tmolavi` · Repository: `sage-audit`
+   - Workflow filename: `publish.yml`
+2. Cut a release on GitHub (*Releases → Draft a new release → tag `v1.0.0`*):
+   the workflow builds the wheel + sdist and publishes them automatically —
+   every future release is a one-click PyPI publish.
+
 ## GitHub Topics
 
 `seo` · `aeo` · `geo` · `generative-engine-optimization` · `ai-search` · `rag` · `mcp-server` · `perplexity` · `chatgpt-search` · `llms-txt` · `schema-markup` · `entity-seo`
@@ -282,6 +353,39 @@ sage audit https://molavi.pro --fail-under 70   # دروازهٔ کیفی در C
 sage mcp                                        # اتصال به Claude Desktop / Cursor
 ```
 
+> **🚧 هنوز روی PyPI منتشر نشده؟** تا قبل از اولین انتشار رسمی (راهنمای گام‌به‌گام در بخش *انتشار روی PyPI* پایین‌تر)، مستقیم از ریپو نصب کنید:
+>
+> ```bash
+> pip install git+https://github.com/tmolavi/sage-audit.git
+> ```
+
+### انتشار روی PyPI (اختیاری — راهنمای گام‌به‌گام نگهدارنده)
+
+دو مقصد انتشار را با هم اشتباه نکنید: **گیت‌هاب** (سورس‌کد — منتشر شده ✅) و **PyPI** (پکیج `pip` روی pypi.org — نیازمند اکانت جدا و یک‌بار راه‌اندازی ⏳). پوش کردن کد به گیت‌هاب به‌هیچ‌وجه پکیج pip منتشر نمی‌کند.
+
+تا قبل از اولین انتشار رسمی، هر کسی می‌تواند مستقیم از ریپو نصب کند:
+
+```bash
+pip install git+https://github.com/tmolavi/sage-audit.git
+```
+
+برای انتشار رسمی روی PyPI:
+
+1. **ساخت اکانت PyPI** — در [pypi.org/account/register](https://pypi.org/account/register/) ثبت‌نام کنید، ایمیل را تأیید و **احراز هویت دو مرحله‌ای (2FA)** را فعال کنید (بدون 2FA پلتفرم اجازهٔ آپلود نمی‌دهد).
+2. **ساخت API Token** — در [pypi.org/manage/account/token](https://pypi.org/manage/account/token/) روی *Add API token* بزنید. چون پروژه هنوز روی PyPI وجود ندارد، scope اولین توکن باید **«Entire account»** باشد (توکن پروژه‌محور فقط بعد از اولین آپلود قابل ساخت است). توکن با `pypi-` شروع می‌شود و مثل رمز عبور محرمانه است.
+3. **Build و آپلود** — از ریشهٔ پروژه:
+
+   ```bash
+   pip install --upgrade build twine
+   python -m build        # خروجی: dist/sage_audit-1.0.0-py3-none-any.whl و .tar.gz
+   twine upload dist/*    # username: __token__ — password: همان توکن pypi-...
+   ```
+
+4. **کنترل نهایی** — صفحهٔ [pypi.org/project/sage-audit](https://pypi.org/project/sage-audit/) را باز کنید؛ از این لحظه `pip install sage-audit` در سراسر جهان کار می‌کند.
+5. **امنیت** — بلافاصله بعد از آپلود، توکن را **Revoke** کنید (یا یک توکن جدید *پروژه‌محور* با تاریخ انقضای کوتاه بسازید). توکن را هرگز داخل git کامیت نکنید.
+
+**مسیر جایگزین بدون توکن (Trusted Publishing):** فایل آمادهٔ [`.github/workflows/publish.yml`](.github/workflows/publish.yml) در ریپو موجود است؛ کافی است یک‌بار در [تنظیمات Publishing اکانت PyPI](https://pypi.org/manage/account/publishing/) گیت‌هاب (Owner: `tmolavi`، Repo: `sage-audit`، Workflow: `publish.yml`) را به‌عنوان Trusted Publisher معرفی کنید — از آن به بعد هر **Release** جدید روی گیت‌هاب، به‌طور خودکار روی PyPI منتشر می‌شود، بدون اینکه هیچ توکنی در جایی ذخیره شود.
+
 ### تضمین پایداری
 
 اگر بستهٔ تعبیهٔ عصبی نصب نباشد یا دانلود مدل شکست بخورد، ستون GEO به‌صورت خودکار به بردارساز قطعی و بازتولیدپذیر n-gram کاهش می‌یابد؛ ابزار **هرگز متوقف نمی‌شود** و نتایج همواره قطعی و قابل اتکا می‌مانند.
@@ -331,6 +435,39 @@ sage generate-llms https://ornek-siteniz.com -o llms.txt --also-chunks
 sage audit https://ornek-siteniz.com --fail-under 70   # CI kalite kapısı
 sage mcp                                               # Claude Desktop / Cursor bağlantısı
 ```
+
+> **🚧 Henüz PyPI'de yok mu?** İlk resmî PyPI sürümüne kadar (aşağıdaki kılavuz) doğrudan depodan kurun:
+>
+> ```bash
+> pip install git+https://github.com/tmolavi/sage-audit.git
+> ```
+
+### PyPI'de Yayınlama (İsteğe Bağlı — Adım Adım Kılavuz)
+
+İki yayın hedefini karıştırmayın: **GitHub** (kaynak kodu — yayınlandı ✅) ve **PyPI** (pypi.org'daki `pip` paketi — ayrı hesap ve tek seferlik kurulum gerekir ⏳). Kodu GitHub'a push etmek, asla bir pip paketi yayınlamaz.
+
+İlk resmî PyPI sürümünden önce herkes doğrudan depodan kurabilir:
+
+```bash
+pip install git+https://github.com/tmolavi/sage-audit.git
+```
+
+Resmî PyPI yayını için:
+
+1. **PyPI hesabı** — [pypi.org/account/register](https://pypi.org/account/register/) adresinden kaydolun, e-postayı doğrulayın ve **2FA**'yı etkinleştirin (2FA olmadan yükleme yapılamaz).
+2. **API tokenı** — [pypi.org/manage/account/token](https://pypi.org/manage/account/token/) sayfasında *Add API token*. Proje henüz PyPI'de olmadığı için ilk tokenın kapsamı **«Entire account»** olmalıdır (proje bazlı token ancak ilk yüklemeden sonra oluşturulabilir). Token `pypi-` ile başlar ve parola gibi gizli tutulmalıdır.
+3. **Derleme & yükleme** — depo kökünden:
+
+   ```bash
+   pip install --upgrade build twine
+   python -m build        # çıktı: dist/sage_audit-1.0.0-py3-none-any.whl + .tar.gz
+   twine upload dist/*    # kullanıcı adı: __token__ — parola: pypi-... tokenı
+   ```
+
+4. **Doğrulama** — [pypi.org/project/sage-audit](https://pypi.org/project/sage-audit/) sayfasını açıp `pip install sage-audit` komutunu test edin; artık tüm dünyada çalışır.
+5. **Güvenlik** — yüklemeden hemen sonra tokenı **revoke** edin (ya da yalnızca bu projeye özel, kısa süreli bir token oluşturun). Tokenı asla git'e commit etmeyin.
+
+**Tokensiz alternatif (Trusted Publishing):** depoda hazır bulunan [`.github/workflows/publish.yml`](.github/workflows/publish.yml) dosyası sayesinde; [PyPI Publishing ayarlarından](https://pypi.org/manage/account/publishing/) `tmolavi/sage-audit` (workflow: `publish.yml`) bir kez Trusted Publisher olarak tanımlandığında, bundan sonraki her GitHub **Release**'i otomatik olarak PyPI'de yayınlanır — hiçbir token saklanmadan.
 
 ### Geliştirici
 

@@ -1,0 +1,47 @@
+# ---------------------------------------------------------------------------
+# SAGE — PyPI publishing via Trusted Publishing (GitHub OIDC, zero secrets)
+#
+# One-time setup (see README → "Distribution & Publishing → Path B"):
+#   1. https://pypi.org/manage/account/publishing → "Add a new pending publisher"
+#        · PyPI project name : sage-audit
+#        · Owner             : tmolavi
+#        · Repository        : sage-audit
+#        · Workflow filename : publish.yml
+#   2. Cut a release on GitHub (Releases → Draft a new release → tag vX.Y.Z).
+#
+# (c) 2026 Taqi Molavi — https://molavi.pro — MIT License
+# ---------------------------------------------------------------------------
+
+name: Publish to PyPI
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  id-token: write # REQUIRED for trusted publishing (OIDC token exchange)
+
+jobs:
+  pypi-publish:
+    name: Build & publish to PyPI
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/sage-audit
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build wheel and sdist
+        run: |
+          python -m pip install --upgrade pip build
+          python -m build
+
+      - name: Publish to PyPI (trusted publishing, no stored tokens)
+        uses: pypa/gh-action-pypi-publish@release/v1
