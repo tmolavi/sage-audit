@@ -1,0 +1,101 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sage-audit"
+dynamic = ["version"]
+description = "The Unified 3-Pillar Audit Engine for SEO, Entity AEO, and Generative Engine Optimization (GEO)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [
+    { name = "Taqi Molavi", email = "taqi@molavi.pro" },
+]
+maintainers = [
+    { name = "Taqi Molavi", email = "taqi@molavi.pro" },
+]
+keywords = [
+    "seo", "aeo", "geo", "generative-engine-optimization", "ai-search",
+    "rag", "mcp-server", "perplexity", "chatgpt-search", "llms-txt",
+    "schema-markup", "entity-seo",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: Console",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Information Technology",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP :: Indexing/Search",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Text Processing :: Markup :: HTML",
+    "Typing :: Typed",
+]
+dependencies = [
+    "click>=8.1",
+    "rich>=13.0",
+    "requests>=2.31",
+    "beautifulsoup4>=4.12",
+    "pydantic>=2.5",
+    "trafilatura>=1.6",
+]
+
+[project.optional-dependencies]
+# Local neural embeddings for the GEO pillar (recommended for best accuracy).
+embeddings = ["fastembed>=0.2.6"]
+transformers = ["sentence-transformers>=2.2"]
+# Model Context Protocol server (Claude Desktop, Cursor, AI agents).
+mcp = ["mcp>=1.2.0"]
+# Everything, one shot.
+all = [
+    "fastembed>=0.2.6",
+    "sentence-transformers>=2.2",
+    "mcp>=1.2.0",
+]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "ruff>=0.4",
+    "mypy>=1.8",
+]
+
+[project.scripts]
+sage = "sage_audit.cli:main"
+
+[project.urls]
+Homepage = "https://molavi.pro"
+Research = "https://molavi.pro/research"
+Repository = "https://github.com/tmolavi/sage-audit"
+Issues = "https://github.com/tmolavi/sage-audit/issues"
+Changelog = "https://github.com/tmolavi/sage-audit/releases"
+
+[tool.hatch.version]
+path = "src/sage_audit/_version.py"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/sage_audit"]
+
+[tool.hatch.build.targets.sdist]
+include = ["src/sage_audit", "tests", "README.md", "LICENSE", "requirements.txt"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.10"
+strict = false
+ignore_missing_imports = true
