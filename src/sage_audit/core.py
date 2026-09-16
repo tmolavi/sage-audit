@@ -1,10 +1,13 @@
 """SAGE orchestrator — runs the SEO, AEO and GEO pipelines and fuses them
 into a single weighted verdict.
 
-Weights (tunable):
+Evidence Taxonomy & Methodology Hardening:
+- All checks classified under E0–E5 epistemic certainty tiers.
+- CSP formulated as Citation Survival Proxy (heuristic proxy, not calibrated probability).
+- Configurable heuristic thresholds across all 3 pillars.
+
+Weights (tunable via config):
     SEO 0.30 · AEO 0.35 · GEO 0.35
-The AI-search pillars carry slightly more weight than classical hygiene,
-reflecting where discovery traffic is heading.
 
 (c) 2026 Taqi Molavi — https://molavi.pro — MIT License
 """
@@ -20,6 +23,7 @@ from sage_audit._version import __version__
 from sage_audit.auditors.aeo_auditor import AeoAuditor
 from sage_audit.auditors.geo_auditor import GeoAuditor, GeoConfig
 from sage_audit.auditors.seo_auditor import SeoAuditor
+from sage_audit.config import SageConfig
 from sage_audit.models import AuditReport, grade_for
 from sage_audit.utils.extractor import (
     DEFAULT_TIMEOUT,
@@ -31,15 +35,13 @@ from sage_audit.utils.extractor import (
     parse_snapshot,
 )
 
-#: Pillar weights for the overall SAGE score.
-PILLAR_WEIGHTS = {"seo": 0.30, "aeo": 0.35, "geo": 0.35}
-
 
 class SageAuditor:
     """One-stop facade for full 3-pillar audits.
 
     Parameters
     ----------
+    config:             optional SageConfig instance with custom heuristic thresholds
     timeout:            per-request network timeout (seconds)
     fetch_robots:       also fetch and analyze /robots.txt on live audits
     embedding_backend:  'auto' | 'fastembed' | 'sentence-transformers' | 'hashing'
@@ -50,24 +52,41 @@ class SageAuditor:
 
     def __init__(
         self,
+        config: Optional[SageConfig] = None,
         *,
-        timeout: float = DEFAULT_TIMEOUT,
-        fetch_robots: bool = True,
-        embedding_backend: str = "auto",
-        top_k: int = 3,
-        chunk_min_tokens: int = 60,
-        chunk_max_tokens: int = 120,
-        chunk_overlap: int = 25,
+        timeout: Optional[float] = None,
+        fetch_robots: Optional[bool] = None,
+        embedding_backend: Optional[str] = None,
+        top_k: Optional[int] = None,
+        chunk_min_tokens: Optional[int] = None,
+        chunk_max_tokens: Optional[int] = None,
+        chunk_overlap: Optional[int] = None,
         session: Optional[requests.Session] = None,
+        **kwargs,
     ) -> None:
-        self.timeout = timeout
-        self.fetch_robots = fetch_robots
+        base_config = config or SageConfig()
+        overrides = {
+            "timeout": timeout,
+            "fetch_robots": fetch_robots,
+            "embedding_backend": embedding_backend,
+            "top_k": top_k,
+            "chunk_min_tokens": chunk_min_tokens,
+            "chunk_max_tokens": chunk_max_tokens,
+            "chunk_overlap": chunk_overlap,
+            **kwargs,
+        }
+        self.config = base_config.update_from_dict(overrides)
         self.geo_config = GeoConfig(
-            min_tokens=chunk_min_tokens,
-            max_tokens=chunk_max_tokens,
-            overlap=chunk_overlap,
-            top_k=top_k,
-            backend=embedding_backend,
+            min_tokens=self.config.chunk_min_tokens,
+            max_tokens=self.config.chunk_max_tokens,
+            overlap=self.config.chunk_overlap,
+            top_k=self.config.top_k,
+            backend=self.config.embedding_backend,
+            max_queries=self.config.max_sim_queries,
+            csp_prominence_weight=self.config.csp_prominence_weight,
+            csp_entropy_weight=self.config.csp_entropy_weight,
+            csp_pass_threshold=self.config.csp_pass_threshold,
+            csp_warn_threshold=self.config.csp_warn_threshold,
         )
         self.session = session or requests.Session()
         self.session.headers.update({"User-Agent": USER_AGENT})
@@ -82,11 +101,11 @@ class SageAuditor:
         started = time.perf_counter()
         url = ensure_url(url)
         status, headers, html, final_url, fetch_ms = fetch_url(
-            url, timeout=self.timeout, session=self.session
+            url, timeout=self.config.timeout, session=self.session
         )
         robots_txt = (
-            fetch_robots_txt(final_url or url, timeout=self.timeout, session=self.session)
-            if self.fetch_robots
+            fetch_robots_txt(final_url or url, timeout=self.config.timeout, session=self.session)
+            if self.config.fetch_robots
             else None
         )
         snapshot = parse_snapshot(
@@ -117,14 +136,15 @@ class SageAuditor:
     # ------------------------------------------------------------------ #
 
     def _run(self, snapshot: PageSnapshot, started: float) -> AuditReport:
-        seo = SeoAuditor().audit(snapshot)
-        aeo = AeoAuditor().audit(snapshot)
+        seo = SeoAuditor(config=self.config).audit(snapshot)
+        aeo = AeoAuditor(config=self.config).audit(snapshot)
         geo = GeoAuditor(config=self.geo_config).audit(snapshot)
 
+        cfg = self.config
         overall = round(
-            seo.score * PILLAR_WEIGHTS["seo"]
-            + aeo.score * PILLAR_WEIGHTS["aeo"]
-            + geo.score * PILLAR_WEIGHTS["geo"],
+            seo.score * cfg.weight_seo
+            + aeo.score * cfg.weight_aeo
+            + geo.score * cfg.weight_geo,
             1,
         )
         artifacts = {**geo.artifacts}
@@ -147,6 +167,8 @@ class SageAuditor:
             duration_ms=round((time.perf_counter() - started) * 1000.0, 2),
             overall_score=overall,
             grade=grade_for(overall),
+            methodology_version="2.0.0",
+            validation_status="unvalidated",
             seo=seo,
             aeo=aeo,
             geo=geo,

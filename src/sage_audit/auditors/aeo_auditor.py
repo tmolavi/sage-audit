@@ -1,8 +1,11 @@
 """Pillar 2 — Answer Engine Optimization (AEO).
 
 Deep JSON-LD entity-graph validation, entity authority (sameAs) analysis,
-FAQ structuring checks, and **direct-answer density**: do the first 50–70
+FAQ structuring checks, and direct-answer density: do the first 50–70
 words of each section state an explicit, factual, fluff-free answer?
+
+Every finding carries explicit epistemic Evidence Taxonomy metadata (E1–E4)
+and never asserts unproven direct ranking-factor claims.
 
 (c) 2026 Taqi Molavi — https://molavi.pro — MIT License
 """
@@ -13,7 +16,15 @@ import re
 import time
 from typing import Any, Iterable, Iterator, Optional
 
-from sage_audit.models import Finding, PillarReport, Status, finalize_pillar
+from sage_audit.config import SageConfig
+from sage_audit.models import (
+    EvidenceLevel,
+    EvidenceMetadata,
+    Finding,
+    PillarReport,
+    Status,
+    finalize_pillar,
+)
 from sage_audit.utils.extractor import PageSnapshot, Section
 from sage_audit.utils.text import mean, split_sentences
 
@@ -146,7 +157,11 @@ def is_question_heading(text: Optional[str]) -> bool:
     return stripped.endswith(("?", "؟")) or bool(QUESTION_START_RE.match(stripped))
 
 
-def answer_quality(section: Section) -> tuple[float, str]:
+def answer_quality(
+    section: Section,
+    word_window: int = 70,
+    min_words: int = 8,
+) -> tuple[float, str]:
     """Score the direct-answer quality of a section's first ~70 words.
 
     Composite heuristic (0–1):
@@ -159,10 +174,10 @@ def answer_quality(section: Section) -> tuple[float, str]:
     """
 
     words = section.text.split()
-    if len(words) < 8:
-        return 0.1, "section too thin to answer (<8 words)"
+    if len(words) < min_words:
+        return 0.1, f"section too thin to answer (<{min_words} words)"
 
-    window = " ".join(words[:70])
+    window = " ".join(words[:word_window])
     sentences = [s for s in split_sentences(window) if s]
     first = sentences[0] if sentences else window
 
@@ -201,6 +216,9 @@ class AeoAuditor:
 
     pillar_name = "Pillar 2 — Answer Engine Optimization (AEO)"
 
+    def __init__(self, config: Optional[SageConfig] = None) -> None:
+        self.config = config or SageConfig()
+
     def audit(self, snap: PageSnapshot) -> PillarReport:
         started = time.perf_counter()
         nodes = list(iter_entity_nodes(snap.json_ld))
@@ -223,8 +241,14 @@ class AeoAuditor:
                 "signals": note,
             }
             for section in snap.sections
-            if section.word_count >= 8
-            for score, note in [answer_quality(section)]
+            if section.word_count >= self.config.direct_answer_min_words
+            for score, note in [
+                answer_quality(
+                    section,
+                    word_window=self.config.direct_answer_word_window,
+                    min_words=self.config.direct_answer_min_words,
+                )
+            ]
         ]
         metrics = {
             "json_ld_blocks": len(snap.json_ld),
@@ -257,6 +281,14 @@ class AeoAuditor:
 
     def _check_jsonld_presence(self, snap: PageSnapshot) -> Finding:
         blocks = len(snap.json_ld)
+        evidence = EvidenceMetadata(
+            level=EvidenceLevel.E1,
+            evidence_type="standards_backed",
+            source="W3C JSON-LD 1.1 / Schema.org Syntax",
+            ranking_factor_claim=False,
+            signal_type="standards_compliance",
+            configurable=False,
+        )
         if blocks == 0:
             return Finding(
                 check_id="aeo.jsonld_presence",
@@ -268,7 +300,8 @@ class AeoAuditor:
                 + (f" ({snap.json_ld_errors} malformed block(s) skipped)."
                    if snap.json_ld_errors else "."),
                 recommendation="Publish JSON-LD (Organization + WebSite at minimum). Without "
-                "an entity graph, answer engines must guess who/what the page is about.",
+                "an explicit entity graph, answer engines must rely on heuristic text extraction.",
+                evidence=evidence,
             )
         details = f"{blocks} JSON-LD block(s) parsed"
         if snap.json_ld_errors:
@@ -281,13 +314,21 @@ class AeoAuditor:
             weight=10.0,
             details=details + ".",
             recommendation="" if not snap.json_ld_errors else
-            "Fix the malformed JSON-LD block(s) — a single syntax error voids the whole "
-            "block for strict parsers.",
+            "Fix the malformed JSON-LD block(s) — syntax errors prevent parsing in strict JSON-LD processors.",
+            evidence=evidence,
         )
 
     def _check_entity_graph(self, type_index: list[set[str]]) -> Finding:
         found = self._families_found(type_index)
         coverage = len(found) / len(TARGET_TYPES)
+        evidence = EvidenceMetadata(
+            level=EvidenceLevel.E1,
+            evidence_type="standards_backed",
+            source="Schema.org Core Entity Types",
+            ranking_factor_claim=False,
+            signal_type="standards_compliance",
+            configurable=False,
+        )
         if not found:
             return Finding(
                 check_id="aeo.entity_graph",
@@ -297,7 +338,8 @@ class AeoAuditor:
                 weight=8.0,
                 details="No Organization, Person, Product, Article or FAQPage entities found.",
                 recommendation="Model the page's core entity in JSON-LD — answer engines "
-                "ground their citations on explicit entity graphs.",
+                "ground their citations on explicit entity relationships.",
+                evidence=evidence,
             )
         listing = "; ".join(f"{family} ({', '.join(sorted(types))})"
                             for family, types in sorted(found.items()))
@@ -311,12 +353,21 @@ class AeoAuditor:
             details=listing + ".",
             recommendation="" if coverage >= 0.5 else
             "Broaden the graph: Organization, Person, Product and Article entities let "
-            "answer engines resolve the page's subject without ambiguity.",
+            "answer engines resolve the page's subject without disambiguation ambiguity.",
+            evidence=evidence,
         )
 
     def _check_entity_completeness(
         self, nodes: list[dict[str, Any]], type_index: list[set[str]]
     ) -> Finding:
+        evidence = EvidenceMetadata(
+            level=EvidenceLevel.E2,
+            evidence_type="platform_guidance",
+            source="Google Structured Data Guidelines & Knowledge Graph Standards",
+            ranking_factor_claim=False,
+            signal_type="retrieval_readiness_signal",
+            configurable=False,
+        )
         primary: Optional[dict[str, Any]] = None
         expected: tuple[str, ...] = ()
         family_picked = ""
@@ -340,7 +391,8 @@ class AeoAuditor:
                 weight=8.0,
                 details="No primary entity (Organization/Person/Product/Article) to evaluate.",
                 recommendation="Declare a primary entity with name, url, image, description "
-                "and sameAs so answer engines can quote it verbatim.",
+                "and sameAs so answer engines can reliably extract entity properties.",
+                evidence=evidence,
             )
         present = [field for field in expected if primary.get(field)]
         missing = [field for field in expected if not primary.get(field)]
@@ -356,8 +408,9 @@ class AeoAuditor:
             f"— present: {', '.join(present)}"
             + (f"; missing: {', '.join(missing)}" if missing else "") + ".",
             recommendation="" if not missing else
-            f"Fill the missing {family_picked} fields ({', '.join(missing)}); incomplete "
-            "entities lose knowledge-panel and citation eligibility.",
+            f"Fill the missing {family_picked} fields ({', '.join(missing)}); complete "
+            "attributes improve knowledge graph linking confidence.",
+            evidence=evidence,
         )
 
     def _check_authority_signals(self, nodes: list[dict[str, Any]]) -> Finding:
@@ -367,11 +420,20 @@ class AeoAuditor:
             if any(domain in url.lower() for url in urls for domain in domains)
         }
         count = len(matched)
-        if count >= 3:
+        target = self.config.authority_sameas_target_count
+        evidence = EvidenceMetadata(
+            level=EvidenceLevel.E1,
+            evidence_type="standards_backed",
+            source="Schema.org sameAs Reference / Linked Data Principles",
+            ranking_factor_claim=False,
+            signal_type="standards_compliance",
+            configurable=True,
+        )
+        if count >= target:
             score, status, rec = 1.0, Status.PASS, ""
         elif count == 2:
             score, status, rec = 0.75, Status.WARN, (
-                "Add Wikidata/Crunchbase cross-references — 3+ authority sameAs links "
+                f"Add Wikidata/Crunchbase cross-references — {target}+ authority sameAs links "
                 "materially raise entity-disambiguation confidence."
             )
         elif count == 1:
@@ -381,9 +443,8 @@ class AeoAuditor:
             )
         else:
             score, status, rec = 0.0, Status.FAIL, (
-                "No sameAs authority links at all. Link the entity to Wikidata, Wikipedia "
-                "and official social profiles — without anchors, answer engines cannot "
-                "verify who you are."
+                "No sameAs authority links found. Link the entity to Wikidata, Wikipedia "
+                "and official profiles to establish verified external entity references."
             )
         return Finding(
             check_id="aeo.authority_sameas",
@@ -396,6 +457,7 @@ class AeoAuditor:
                 f"{', '.join(sorted(matched)) if matched else 'none'}."
             ),
             recommendation=rec,
+            evidence=evidence,
         )
 
     def _check_faq_structuring(
@@ -403,6 +465,14 @@ class AeoAuditor:
     ) -> Finding:
         has_faq_schema = any(types & TARGET_TYPES["FAQPage"] for types in type_index)
         question_headings = [text for _, text in snap.headings if is_question_heading(text)]
+        evidence = EvidenceMetadata(
+            level=EvidenceLevel.E2,
+            evidence_type="platform_guidance",
+            source="Schema.org FAQPage & Google Search Q&A Specification",
+            ranking_factor_claim=False,
+            signal_type="retrieval_readiness_signal",
+            configurable=False,
+        )
         if has_faq_schema:
             return Finding(
                 check_id="aeo.faq_structuring",
@@ -413,6 +483,7 @@ class AeoAuditor:
                 details=f"FAQPage/QAPage schema present; {len(question_headings)} "
                 "question-style heading(s) in body copy.",
                 recommendation="",
+                evidence=evidence,
             )
         if len(question_headings) >= 2:
             return Finding(
@@ -423,8 +494,9 @@ class AeoAuditor:
                 weight=6.0,
                 details=f"{len(question_headings)} question-style headings found but no "
                 "FAQPage schema marks them up.",
-                recommendation="Wrap the existing Q&A content in FAQPage JSON-LD — the "
-                "questions are already there, machines just can't pair them yet.",
+                recommendation="Wrap the existing Q&A content in FAQPage JSON-LD to explicitly "
+                "pair questions with answers for machine consumption.",
+                evidence=evidence,
             )
         return Finding(
             check_id="aeo.faq_structuring",
@@ -433,12 +505,26 @@ class AeoAuditor:
             score=0.4,
             weight=6.0,
             details="Neither FAQPage schema nor question-style headings detected.",
-            recommendation="Add a Q&A block (real user questions, 40–70 word answers) and "
-            "mark it up as FAQPage — the single highest-yield AEO pattern.",
+            recommendation="Add a Q&A block (real user questions, direct 40–70 word answers) and "
+            "mark it up as FAQPage for explicit question-answer pairing.",
+            evidence=evidence,
         )
 
     def _check_direct_answer_density(self, snap: PageSnapshot) -> Finding:
-        sections = [s for s in snap.sections if s.word_count >= 8]
+        min_words = self.config.direct_answer_min_words
+        window_size = self.config.direct_answer_word_window
+        target_density = self.config.direct_answer_target_density
+        min_density = self.config.direct_answer_min_density
+
+        sections = [s for s in snap.sections if s.word_count >= min_words]
+        evidence = EvidenceMetadata(
+            level=EvidenceLevel.E4,
+            evidence_type="industry_heuristic",
+            source="Direct Answer & Information Extraction Optimization (VPA)",
+            ranking_factor_claim=False,
+            signal_type="industry_heuristic",
+            configurable=True,
+        )
         if not sections:
             return Finding(
                 check_id="aeo.direct_answer_density",
@@ -447,27 +533,29 @@ class AeoAuditor:
                 score=0.0,
                 weight=14.0,
                 details="No substantive sections to analyze.",
-                recommendation="Structure the page as headed sections whose first 40–70 "
+                recommendation=f"Structure the page as headed sections whose first {window_size} "
                 "words contain a self-contained, factual answer.",
+                evidence=evidence,
             )
-        scored = [answer_quality(section) for section in sections]
+        scored = [
+            answer_quality(section, word_window=window_size, min_words=min_words)
+            for section in sections
+        ]
         density = round(mean([score for score, _ in scored]), 3)
         definitional_openers = sum(1 for score, _ in scored if score >= 0.5)
         weakest_idx = min(range(len(scored)), key=lambda i: scored[i][0])
         weakest = sections[weakest_idx]
-        if density >= 0.55:
+        if density >= target_density:
             status = Status.PASS
             rec = ""
-        elif density >= 0.35:
+        elif density >= min_density:
             status = Status.WARN
-            rec = ("Open every section with a 40–70 word self-contained answer (definition "
-                   "+ one fact/number). Avoid rhetorical warm-ups — answer engines extract "
-                   "the first window of a section verbatim.")
+            rec = (f"Open every section with a {window_size}-word self-contained answer (definition "
+                   "+ key fact/data). Avoid rhetorical warm-ups to facilitate direct answer extraction.")
         else:
             status = Status.FAIL
-            rec = ("Sections open with fluff or narration instead of facts. Rewrite each "
-                   "opening sentence as 'X is/has/costs …' so answer engines can lift it "
-                   "directly.")
+            rec = ("Sections open with conversational fluff instead of direct factual answers. "
+                   "Rewrite section opening sentences declaratively ('X is/provides …') for clean answer extraction.")
         return Finding(
             check_id="aeo.direct_answer_density",
             title="Direct-answer density",
@@ -479,11 +567,20 @@ class AeoAuditor:
             f"answer · weakest: “{weakest.heading or 'Introduction'}” "
             f"({scored[weakest_idx][1]}).",
             recommendation=rec,
+            evidence=evidence,
         )
 
     def _check_freshness(
         self, snap: PageSnapshot, nodes: list[dict[str, Any]]
     ) -> Finding:
+        evidence = EvidenceMetadata(
+            level=EvidenceLevel.E2,
+            evidence_type="platform_guidance",
+            source="Google / Schema.org Temporal Metadata Guidance",
+            ranking_factor_claim=False,
+            signal_type="retrieval_readiness_signal",
+            configurable=False,
+        )
         date_fields = ("datePublished", "dateModified", "dateCreated", "uploadDate")
         schema_dates = [node[f] for node in nodes for f in date_fields if node.get(f)]
         meta_dates = [
@@ -506,6 +603,7 @@ class AeoAuditor:
                 weight=4.0,
                 details=f"Date signal found ({sample[:40]}).",
                 recommendation="",
+                evidence=evidence,
             )
         return Finding(
             check_id="aeo.freshness",
@@ -514,11 +612,20 @@ class AeoAuditor:
             score=0.3,
             weight=4.0,
             details="No datePublished/dateModified/meta dates/<time datetime> found.",
-            recommendation="Expose machine-readable dates (JSON-LD dateModified preferred); "
-            "answer engines actively down-weight undated content.",
+            recommendation="Expose machine-readable timestamps (JSON-LD dateModified preferred) "
+            "to establish publication and update freshness.",
+            evidence=evidence,
         )
 
     def _check_entity_linking(self, nodes: list[dict[str, Any]]) -> Finding:
+        evidence = EvidenceMetadata(
+            level=EvidenceLevel.E1,
+            evidence_type="standards_backed",
+            source="W3C Linked Data / Schema.org @id Graph Identity",
+            ranking_factor_claim=False,
+            signal_type="standards_compliance",
+            configurable=False,
+        )
         with_ids = [node for node in nodes if node.get("@id")]
         with_links = [
             node for node in nodes if node.get("about") or node.get("mentions")
@@ -532,6 +639,7 @@ class AeoAuditor:
                 weight=0.0,
                 details="No entity graph to inspect.",
                 recommendation="",
+                evidence=evidence,
             )
         ratio = len(with_ids) / max(len(nodes), 1)
         score = min(1.0, ratio + 0.25 * bool(with_links) + 0.1 * bool(with_ids))
@@ -545,6 +653,7 @@ class AeoAuditor:
             details=f"{len(with_ids)}/{len(nodes)} nodes carry stable @id anchors; "
             f"{len(with_links)} use about/mentions cross-links.",
             recommendation="" if score >= 0.8 else
-            "Give entities stable @id URIs (#org, #product) and cross-reference them with "
-            "about/mentions — linked graphs resolve faster than isolated nodes.",
+            "Assign entities stable @id URIs (#org, #product) and cross-reference them with "
+            "about/mentions for connected graph traversal.",
+            evidence=evidence,
         )

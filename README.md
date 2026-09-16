@@ -43,13 +43,13 @@ Classical SEO tools stop at title tags and page speed. They tell you *nothing* a
 | --- | --- | --- |
 | **1️⃣ Technical SEO** | `seo_auditor.py` | Clean-DOM extraction, text-to-code ratio, canonicals, meta robots (`noindex`/`nosnippet`), Open Graph, H1 hygiene, security/cache HTTP headers, and AI-crawler `robots.txt` policy (GPTBot, PerplexityBot, ClaudeBot, Google-Extended, Amazonbot, Applebot-Extended) |
 | **2️⃣ Answer Engine Optimization (AEO)** | `aeo_auditor.py` | Recursive JSON-LD entity-graph validation (`Organization`, `Person`, `Product`, `Article`, `FAQPage`), entity completeness, `sameAs` authority signals (Wikidata, Wikipedia, Crunchbase, official profiles), FAQ structuring, machine-readable freshness, and **direct-answer density** of the first 50–70 words of every section |
-| **3️⃣ Generative Engine Optimization (GEO)** | `geo_auditor.py` | Semantic passage chunking (60–120 tokens), local vector embeddings with graceful fallback, in-memory RAG retrieval simulation, cosine-distance & semantic-entropy analysis, **Citation Survival Probability (CSP)**, and auto-generation of `llms.txt` + `rag_ready_chunks.json` |
+| **3️⃣ Generative Engine Optimization (GEO)** | `geo_auditor.py` | Semantic passage chunking (60–120 tokens), local vector embeddings with graceful fallback, in-memory RAG retrieval simulation, cosine-distance & semantic-entropy analysis, **Citation Survival Proxy (CSP)**, and auto-generation of `llms.txt` + `rag_ready_chunks.json` |
 
 ### The 5-Layer GEO Pyramid
 
 ```text
                     ┌───────────────────────────────────────┐
-          L5        │  CITATION SURVIVAL PROBABILITY +      │
+          L5        │  CITATION SURVIVAL PROXY (CSP) +      │
                     │  llms.txt / rag_ready_chunks.json     │
                     ├───────────────────────────────────────┤
           L4        │  RAG RETRIEVAL SIMULATION             │
@@ -189,12 +189,23 @@ Or without installing, via `uvx`:
 }
 ```
 
-## Scoring Model
+## Scoring Model & Epistemic Evidence Taxonomy
 
-- Every check is a weighted **Finding** (`pass / warn / fail / info`, 0–1 score, evidence + fix).
-- Pillar score = weighted mean × 100. Overall = `0.30·SEO + 0.35·AEO + 0.35·GEO`.
-- Grades: **A+ ≥ 93 · A ≥ 85 · B ≥ 75 · C ≥ 65 · D ≥ 50 · F < 50**.
-- **Citation Survival Probability (CSP):** per simulated entity query, SAGE embeds query + passages, ranks by cosine similarity, and combines *retrieval prominence* (z-score of the winner vs. the field) with *(1 − normalized semantic entropy)* of the similarity softmax: `CSP = mean(0.6·prominence + 0.4·(1−entropy)) × 100`.
+- Every check is a weighted **Finding** tagged with structured epistemic **Evidence Taxonomy (E0–E5)** metadata:
+  - **`E0`**: Deterministic technical facts (HTTP status, headers, HTML tag presence, syntax).
+  - **`E1`**: Standards & specifications (W3C HTML5, Schema.org, IETF RFCs).
+  - **`E2`**: Documented search engine & platform guidance (Google Search Central, bot policies).
+  - **`E3`**: Empirical evidence from validated benchmark datasets.
+  - **`E4`**: Industry heuristics & configurable thresholds (word counts, chunk sizes, answer density).
+  - **`E5`**: Experimental proxies & mathematical models (CSP, softmax semantic entropy).
+- **Prohibition of Unproven Claims**: SAGE strictly labels heuristics and proxies without asserting unproven direct ranking-factor claims.
+- **Pillar score** = weighted mean × 100. Overall = `0.30·SEO + 0.35·AEO + 0.35·GEO` (configurable).
+- **Grades**: **A+ ≥ 93 · A ≥ 85 · B ≥ 75 · C ≥ 65 · D ≥ 50 · F < 50**.
+- **Citation Survival Proxy (CSP)**: A heuristic proxy score (0–100) evaluating candidate passage retrieval prominence and low semantic entropy under simulated dense vector retrieval:
+  $$\text{CSP} = \text{mean}(0.6 \cdot \text{prominence} + 0.4 \cdot (1 - \text{entropy})) \times 100$$
+  *(Note: CSP is an uncalibrated heuristic retrieval proxy, not a literal probability of external AI citation).*
+- **Empirical Validation Framework**: Compare SAGE/CSP scores against real observed AI search citation logs via Spearman correlation ($\rho$), AUROC, Precision@k, Brier score, and probability calibration curves (`sage validate`).
+- Detailed specification in **[docs/methodology.md](docs/methodology.md)**.
 
 ## Project Structure
 
@@ -204,29 +215,37 @@ sage-audit/
 ├── pyproject.toml              # build system, metadata, deps, `sage` entrypoint
 ├── requirements.txt
 ├── .gitignore
+├── docs/
+│   └── methodology.md          # Full Evidence Taxonomy & CSP specification
 ├── src/
 │   └── sage_audit/
-│       ├── __init__.py         # exports SageAuditor, models, __version__
+│       ├── __init__.py         # exports SageAuditor, models, validation, __version__
 │       ├── _version.py         # single source of truth
-│       ├── models.py           # pydantic schemas (Finding/Pillar/AuditReport)
-│       ├── cli.py              # sage audit | generate-llms | mcp
-│       ├── core.py             # SAGE orchestrator (0.30/0.35/0.35 fusion)
+│       ├── config.py           # SageConfig & configurable heuristic thresholds
+│       ├── models.py           # pydantic schemas (EvidenceMetadata, CspDetails, Reports)
+│       ├── validation.py       # Spearman, AUROC, Precision@k, Brier score, calibration
+│       ├── cli.py              # sage audit | generate-llms | validate | mcp
+│       ├── core.py             # SAGE orchestrator (0.30/0.35/0.35 configurable fusion)
 │       ├── auditors/
 │       │   ├── __init__.py
-│       │   ├── seo_auditor.py  # Pillar 1 — Technical SEO
-│       │   ├── aeo_auditor.py  # Pillar 2 — Entity AEO
-│       │   └── geo_auditor.py  # Pillar 3 — GEO / RAG simulation
+│       │   ├── seo_auditor.py  # Pillar 1 — Technical SEO (E0–E4)
+│       │   ├── aeo_auditor.py  # Pillar 2 — Entity AEO (E1–E4)
+│       │   └── geo_auditor.py  # Pillar 3 — GEO / RAG simulation / CSP (E0, E4, E5)
 │       ├── server/
 │       │   ├── __init__.py
 │       │   └── mcp_server.py   # FastMCP tools for AI agents
 │       └── utils/
 │           ├── __init__.py
 │           ├── extractor.py    # clean text / DOM parser (Trafilatura + BS4)
-│           ├── formatter.py    # terminal / JSON / Markdown renderers
+│           ├── formatter.py    # terminal / JSON / Markdown renderers with taxonomy
 │           └── text.py         # tokenizer, sentence splitter, vector math
 ├── tests/
 │   ├── __init__.py
-│   └── test_auditors.py        # SEO, AEO, GEO, core, CLI unit tests
+│   ├── test_auditors.py        # SEO, AEO, GEO, core, CLI unit tests
+│   ├── test_taxonomy.py        # Evidence taxonomy & ranking claims tests
+│   ├── test_csp_hardening.py   # Hardened CSP proxy semantics tests
+│   ├── test_validation.py      # Statistical validation & calibration tests
+│   └── test_config.py          # Heuristic threshold override tests
 └── README.md
 ```
 

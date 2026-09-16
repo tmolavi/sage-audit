@@ -1,9 +1,10 @@
 """`sage` — the SAGE command-line interface.
 
 Commands:
-    sage audit <url>          run the full 3-pillar audit
+    sage audit <url>          run the full 3-pillar audit with Evidence Taxonomy
     sage audit --raw-html f   audit a local HTML file (offline)
-    sage generate-llms <url>  emit an optimized llms.txt
+    sage generate-llms <url>  emit an optimized llms.txt with CSP metadata
+    sage validate             validate SAGE/CSP predictions against empirical observations
     sage mcp                  start the FastMCP server for AI agents
 
 (c) 2026 Taqi Molavi — https://molavi.pro — MIT License
@@ -11,6 +12,7 @@ Commands:
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 
@@ -19,6 +21,7 @@ from rich.console import Console
 from rich.markup import escape
 
 from sage_audit._version import __version__
+from sage_audit.config import SageConfig
 from sage_audit.core import SageAuditor
 from sage_audit.utils.extractor import FetchError
 from sage_audit.utils.formatter import (
@@ -26,21 +29,11 @@ from sage_audit.utils.formatter import (
     render_markdown,
     render_terminal,
 )
+from sage_audit.validation import evaluate_sage_vs_observed
 
 BANNER = "SAGE — Search, Answer, & Generative Engine Auditor"
 
 err_console = Console(stderr=True)
-
-
-def _build_auditor(
-    timeout: float, embedding_backend: str, top_k: int, no_robots: bool
-) -> SageAuditor:
-    return SageAuditor(
-        timeout=timeout,
-        fetch_robots=not no_robots,
-        embedding_backend=embedding_backend,
-        top_k=top_k,
-    )
 
 
 def _common_options(func):
@@ -65,11 +58,19 @@ def main() -> None:
     AEO, and Generative Engine Optimization (GEO).
 
     \b
+    Features:
+      - Epistemic Evidence Taxonomy (E0–E5) on all audit checks
+      - Hardened Citation Survival Proxy (CSP) heuristic metrics
+      - Configurable heuristic thresholds
+      - Empirical validation & calibration framework
+
+    \b
     Examples:
       sage audit https://molavi.pro
       sage audit https://molavi.pro --format markdown -o report.md
       sage audit --raw-html page.html --format json | jq .overall_score
       sage generate-llms https://molavi.pro -o llms.txt
+      sage validate --predictions preds.json --observations obs.json
       sage mcp                    # serve AI agents via Model Context Protocol
     """
 
@@ -107,6 +108,18 @@ def main() -> None:
               help="Simulated RAG top-k retrieval depth.")
 @click.option("--no-robots", is_flag=True, help="Skip robots.txt fetching.")
 @click.option(
+    "--chunk-min-tokens", type=int, default=60, show_default=True,
+    help="Minimum token boundary for semantic chunking.",
+)
+@click.option(
+    "--chunk-max-tokens", type=int, default=120, show_default=True,
+    help="Maximum token boundary for semantic chunking.",
+)
+@click.option(
+    "--config-file", type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    help="Path to JSON file containing SageConfig threshold overrides.",
+)
+@click.option(
     "--fail-under",
     type=float,
     default=None,
@@ -123,6 +136,9 @@ def audit(
     save_artifacts: Path | None,
     top_k: int,
     no_robots: bool,
+    chunk_min_tokens: int,
+    chunk_max_tokens: int,
+    config_file: Path | None,
     fail_under: float | None,
     embedding_backend: str,
     timeout: float,
@@ -131,11 +147,27 @@ def audit(
 
     if not target and not raw_html:
         raise click.UsageError("Provide a URL (e.g. `sage audit https://site.com`) "
-                               "or `--raw-html page.html`.")
+                                "or `--raw-html page.html`.")
     if target and raw_html:
         raise click.UsageError("TARGET and --raw-html are mutually exclusive.")
 
-    auditor = _build_auditor(timeout, embedding_backend, top_k, no_robots)
+    cfg = SageConfig(
+        timeout=timeout,
+        fetch_robots=not no_robots,
+        embedding_backend=embedding_backend,
+        top_k=top_k,
+        chunk_min_tokens=chunk_min_tokens,
+        chunk_max_tokens=chunk_max_tokens,
+    )
+    if config_file:
+        try:
+            overrides = json.loads(config_file.read_text(encoding="utf-8"))
+            cfg = cfg.update_from_dict(overrides)
+        except Exception as exc:
+            err_console.print(f"[red]✖ Failed to parse config file:[/] {escape(str(exc))}")
+            sys.exit(2)
+
+    auditor = SageAuditor(config=cfg)
     spinner = err_console if fmt != "terminal" else Console(stderr=True)
     try:
         with spinner.status(f"[bold cyan]{BANNER}[/] — auditing…", spinner="dots"):
@@ -194,7 +226,8 @@ def generate_llms(
 ) -> None:
     """Generate an optimized llms.txt for TARGET (llmstxt.org convention)."""
 
-    auditor = _build_auditor(timeout, embedding_backend, top_k=3, no_robots=False)
+    cfg = SageConfig(timeout=timeout, embedding_backend=embedding_backend, top_k=3, fetch_robots=False)
+    auditor = SageAuditor(config=cfg)
     try:
         with err_console.status("[bold cyan]Analyzing page & synthesizing llms.txt…[/]",
                                 spinner="dots"):
@@ -214,6 +247,34 @@ def generate_llms(
             err_console.print(f"[green]✔ rag_ready_chunks.json written to {chunks_path}[/]")
     else:
         click.echo(llms_txt)
+
+
+@main.command("validate")
+@click.option(
+    "--predictions", "-p",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    required=True,
+    help="JSON file containing array of predicted SAGE or CSP scores.",
+)
+@click.option(
+    "--observations", "-o",
+    type=click.Path(exists=True, dir_okay=False, path_type=Path),
+    required=True,
+    help="JSON file containing array of binary observed citation outcomes (1/0).",
+)
+@click.option("--dataset-name", default="benchmark-dataset", help="Name of validation dataset.")
+@click.option("--k", type=int, default=5, show_default=True, help="Cutoff k for Precision@k.")
+def validate_command(predictions: Path, observations: Path, dataset_name: str, k: int) -> None:
+    """Validate SAGE or CSP scores against real observed AI citation outcomes."""
+    try:
+        preds = json.loads(predictions.read_text(encoding="utf-8"))
+        obs = json.loads(observations.read_text(encoding="utf-8"))
+    except Exception as exc:
+        err_console.print(f"[red]✖ Failed to read input files:[/] {escape(str(exc))}")
+        sys.exit(2)
+
+    result = evaluate_sage_vs_observed(preds, obs, k=k, dataset_name=dataset_name)
+    click.echo(json.dumps(result.to_dict(), indent=2))
 
 
 @main.command(name="mcp")

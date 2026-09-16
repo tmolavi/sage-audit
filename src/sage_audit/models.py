@@ -1,9 +1,17 @@
 """Shared pydantic schemas for sage-audit reports.
 
-Every auditor emits a list of :class:`Finding` objects. Findings are
-aggregated into a :class:`PillarReport` (SEO / AEO / GEO), and the three
-pillars are composed into a single :class:`AuditReport` by the orchestrator
-(:class:`sage_audit.core.SageAuditor`).
+Every auditor emits a list of :class:`Finding` objects tagged with structured
+evidence taxonomy metadata (:class:`EvidenceMetadata`). Findings are aggregated
+into a :class:`PillarReport` (SEO / AEO / GEO), and the three pillars are composed
+into a single :class:`AuditReport` by the orchestrator (:class:`sage_audit.core.SageAuditor`).
+
+Evidence Taxonomy:
+    E0: Deterministic technical fact (HTTP status, headers, tag existence, syntax)
+    E1: Standards / specification backed (W3C HTML5, Schema.org, RFCs)
+    E2: Documented platform / search-engine guidance (Google Search Central, Bing webmaster, bot specs)
+    E3: Empirical evidence (statistically validated on external benchmark datasets)
+    E4: Industry heuristic (established engineering/SEO best practices)
+    E5: Experimental hypothesis / proxy (uncalibrated mathematical proxies, e.g. CSP)
 
 (c) 2026 Taqi Molavi — https://molavi.pro — MIT License
 """
@@ -25,6 +33,64 @@ class Status(str, Enum):
     WARN = "warn"
     FAIL = "fail"
     INFO = "info"
+
+
+class EvidenceLevel(str, Enum):
+    """Hierarchy of epistemic certainty for SAGE audit checks."""
+
+    E0 = "E0"  # Deterministic technical fact
+    E1 = "E1"  # Standards / specification backed
+    E2 = "E2"  # Documented platform / search engine guidance
+    E3 = "E3"  # Empirical evidence from validated benchmark datasets
+    E4 = "E4"  # Industry heuristic
+    E5 = "E5"  # Experimental hypothesis / heuristic proxy
+
+
+class EvidenceMetadata(BaseModel):
+    """Epistemic evidence classification and attribution for an audit finding."""
+
+    level: EvidenceLevel = Field(description="Evidence taxonomy tier (E0-E5).")
+    evidence_type: str = Field(description="Human-readable classification of the evidence type.")
+    source: Optional[str] = Field(default=None, description="Standards document, specification, or platform guideline reference.")
+    ranking_factor_claim: bool = Field(default=False, description="Strictly false: SAGE does not claim unproven direct ranking factors.")
+    signal_type: str = Field(description="Epistemic character of the signal (e.g. 'technical_fact', 'standards_compliance', 'retrieval_readiness_signal', 'heuristic_proxy').")
+    configurable: bool = Field(default=False, description="Whether the heuristic thresholds can be adjusted via config.")
+
+    model_config = {"use_enum_values": True}
+
+
+class CspDetails(BaseModel):
+    """Citation Survival Proxy (CSP) diagnostic metadata and mathematical specification."""
+
+    value: Optional[float] = Field(default=None, ge=0.0, le=100.0, description="Heuristic composite score (0-100).")
+    metric_name: str = "Citation Survival Proxy"
+    abbreviation: str = "CSP"
+    metric_type: str = "heuristic_proxy"
+    calibrated_probability: bool = False
+    evidence_level: EvidenceLevel = EvidenceLevel.E5
+    scale: str = "0-100"
+    formula: str = "mean(0.6 * retrieval_prominence + 0.4 * (1.0 - normalized_semantic_entropy)) * 100"
+    weights: dict[str, float] = Field(
+        default_factory=lambda: {"retrieval_prominence": 0.6, "semantic_entropy_inverse": 0.4}
+    )
+    assumptions: list[str] = Field(
+        default_factory=lambda: [
+            "In-memory single-query dense vector retrieval against local passage chunks.",
+            "Cosine similarity reflects relative query-passage affinity under the selected embedding backend.",
+            "High retrieval prominence (low score dispersion) and low softmax entropy correlate with candidate passage selection in RAG context injection.",
+        ]
+    )
+    limitations: list[str] = Field(
+        default_factory=lambda: [
+            "Not a calibrated statistical probability of being cited by live generative search engines (ChatGPT, Perplexity, Gemini, Claude).",
+            "Does not account for external live web index ranking, multi-source competitive retrieval, prompt variability, or generative model reasoning/pruning.",
+            "Requires external calibration against live observed query-citation logs to establish empirical correlation.",
+        ]
+    )
+    validation_status: str = "unvalidated"
+    validation_dataset: Optional[str] = None
+
+    model_config = {"use_enum_values": True}
 
 
 #: Ordered (min_score, letter) grade thresholds, highest first.
@@ -72,6 +138,7 @@ class Finding(BaseModel):
     weight: float = Field(ge=0.0, default=1.0)
     details: str = Field(default="", description="Measured facts / evidence.")
     recommendation: str = Field(default="", description="Actionable fix guidance.")
+    evidence: Optional[EvidenceMetadata] = Field(default=None, description="Epistemic evidence taxonomy metadata.")
 
     model_config = {"use_enum_values": True}
 
@@ -107,6 +174,8 @@ class AuditReport(BaseModel):
     duration_ms: float = 0.0
     overall_score: float = Field(ge=0.0, le=100.0, default=0.0)
     grade: str = "F"
+    methodology_version: str = "2.0.0"
+    validation_status: str = "unvalidated"
     seo: PillarReport
     aeo: PillarReport
     geo: PillarReport

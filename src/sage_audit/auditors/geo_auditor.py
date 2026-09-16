@@ -7,15 +7,22 @@ Five-layer GEO pyramid:
     L3  Vector embeddings — fastembed → sentence-transformers → deterministic
         hashed n-gram TF fallback (the pipeline *never* crashes)
     L4  In-memory RAG retrieval simulation against derived entity queries
-    L5  Citation Survival Probability + auto-generated llms.txt /
+    L5  Citation Survival Proxy (CSP) + auto-generated llms.txt /
         rag_ready_chunks.json
 
-Citation Survival Probability (CSP) aggregates, per simulated query:
+Citation Survival Proxy (CSP):
+A heuristic proxy score (0–100) reflecting how decisively a page's passages win
+in simulated single-query dense vector retrieval against derived probe queries:
   * retrieval prominence — z-score of the best chunk's cosine similarity vs.
     the similarity distribution (is there a clear winner?), and
   * (1 - normalized semantic entropy) of the similarity softmax (how diffuse
     is the retriever's attention?).
-CSP = mean(0.6 * prominence + 0.4 * (1 - entropy)) × 100.
+Formula: CSP = mean(0.6 * prominence + 0.4 * (1 - entropy)) × 100.
+
+Methodological Notice:
+CSP is an uncalibrated heuristic proxy for retrieval-readiness. It is NOT a
+literal statistical probability of being cited by external LLM services
+(such as ChatGPT, Perplexity, Gemini, or Claude).
 
 (c) 2026 Taqi Molavi — https://molavi.pro — MIT License
 """
@@ -32,7 +39,16 @@ from typing import Any, Optional, Sequence
 
 from sage_audit._version import __version__
 from sage_audit.auditors.aeo_auditor import iter_entity_nodes
-from sage_audit.models import Finding, PillarReport, Status, finalize_pillar
+from sage_audit.config import SageConfig
+from sage_audit.models import (
+    CspDetails,
+    EvidenceLevel,
+    EvidenceMetadata,
+    Finding,
+    PillarReport,
+    Status,
+    finalize_pillar,
+)
 from sage_audit.utils.extractor import PageSnapshot, Section
 from sage_audit.utils.text import (
     LOWER_TOKEN_RE,
@@ -77,7 +93,6 @@ def _slice_oversized(sentence: str, max_tokens: int) -> list[str]:
     """Hard-split a sentence that alone exceeds ``max_tokens``."""
 
     words = sentence.split()
-    # ~0.75 words per token keeps slices comfortably below the token ceiling.
     step = max(8, int(max_tokens * 0.6))
     return [" ".join(words[i:i + step]) for i in range(0, len(words), step)]
 
@@ -158,11 +173,9 @@ def chunk_sections(
         buffer.append(sentence)
         buffer_tokens += sentence_tokens
         if heading != buffer_heading and buffer_tokens < min_tokens:
-            buffer_heading = heading  # small chunk drifts to the newer section
+            buffer_heading = heading
     flush()
 
-    # Merge a trailing micro-chunk into its predecessor when this does not
-    # blow the size envelope past max_tokens + min_tokens // 2.
     while len(chunks) >= 2 and chunks[-1].token_count < min_tokens:
         previous, last = chunks[-2], chunks[-1]
         if previous.token_count + last.token_count > max_tokens + min_tokens // 2:
@@ -177,7 +190,7 @@ def chunk_sections(
         )
         chunks.pop()
 
-    for index, chunk in enumerate(chunks):  # normalize ids after merges
+    for index, chunk in enumerate(chunks):
         chunk.index = index
         chunk.id = f"chunk-{index:03d}"
     return chunks
@@ -265,10 +278,10 @@ def resolve_backend(prefer: str = "auto") -> Any:
     """
 
     if prefer != "auto":
-        cls = _BACKEND_REGISTRY[prefer]
+        cls = _BACKEND_REGISTRY.get(prefer, HashingVectorBackend)
         try:
             return cls()
-        except Exception as exc:  # pragma: no cover - env dependent
+        except Exception as exc:
             logger.warning("Requested backend %s unavailable (%s); using fallback.",
                            prefer, exc)
             return HashingVectorBackend()
@@ -327,6 +340,8 @@ def simulate_rag(
     chunks: Sequence[Chunk],
     embedder: Any,
     top_k: int = 3,
+    prominence_weight: float = 0.6,
+    entropy_weight: float = 0.4,
 ) -> dict[str, Any]:
     """Simulate dense retrieval of ``chunks`` for each query.
 
@@ -334,9 +349,12 @@ def simulate_rag(
     """
 
     if not queries or not chunks:
+        csp_meta = CspDetails(value=None)
         return {
             "per_query": [],
             "csp": None,
+            "citation_survival_proxy": None,
+            "csp_details": csp_meta.model_dump(),
             "avg_entropy": None,
             "retrieval_coverage": None,
             "backend": getattr(embedder, "display", "unknown"),
@@ -360,15 +378,12 @@ def simulate_rag(
         if len(sims) > 1:
             spread = stddev(sims)
             dispersion = (sims[order[0]] - mean(sims)) / (spread + 1e-9)
-            # Adaptive temperature: entropy is measured relative to the
-            # similarity spread, so genuinely diffuse rankings score ~1 and
-            # peaked rankings ~0 regardless of absolute cosine magnitudes.
             entropy = normalized_softmax_entropy(sims, temperature=max(spread, 1e-9))
         else:
-            dispersion = 1.5  # single-chunk corpus: neutral prominence
+            dispersion = 1.5
             entropy = 0.0
         prominence = max(0.0, min(1.0, dispersion / 3.0))
-        survival = 0.6 * prominence + 0.4 * (1.0 - entropy)
+        survival = prominence_weight * prominence + entropy_weight * (1.0 - entropy)
 
         entropies.append(entropy)
         survivals.append(survival)
@@ -380,13 +395,22 @@ def simulate_rag(
                 "top_k_chunks": [chunks[i].id for i in top],
                 "retrieval_prominence": round(prominence, 3),
                 "semantic_entropy": round(entropy, 3),
-                "survival_probability": round(survival, 3),
+                "survival_proxy": round(survival, 3),
+                "survival_probability": round(survival, 3),  # backward compatibility alias
             }
         )
 
+    csp_val = round(100.0 * mean(survivals), 1)
+    csp_details = CspDetails(
+        value=csp_val,
+        weights={"retrieval_prominence": prominence_weight, "semantic_entropy_inverse": entropy_weight},
+    )
+
     return {
         "per_query": per_query,
-        "csp": round(100.0 * mean(survivals), 1),
+        "csp": csp_val,
+        "citation_survival_proxy": csp_val,
+        "csp_details": csp_details.model_dump(),
         "avg_entropy": round(mean(entropies), 3),
         "retrieval_coverage": round(len(retrieved) / len(chunks), 3),
         "backend": getattr(embedder, "display", "unknown"),
@@ -427,7 +451,7 @@ def build_llms_txt(
     lines.append(f"Generated by sage-audit v{__version__} — https://molavi.pro")
     lines.append(
         f"Chunks: {len(chunks)} · Tokens: {snap.token_count}"
-        + (f" · Citation Survival Probability: {csp:.1f}%" if csp is not None else "")
+        + (f" · Citation Survival Proxy (CSP): {csp:.1f}/100" if csp is not None else "")
     )
     return "\n".join(lines).rstrip() + "\n"
 
@@ -469,6 +493,10 @@ class GeoConfig:
     top_k: int = 3
     backend: str = "auto"
     max_queries: int = 8
+    csp_prominence_weight: float = 0.6
+    csp_entropy_weight: float = 0.4
+    csp_pass_threshold: float = 70.0
+    csp_warn_threshold: float = 45.0
 
 
 class GeoAuditor:
@@ -476,8 +504,22 @@ class GeoAuditor:
 
     pillar_name = "Pillar 3 — Generative Engine Optimization (GEO)"
 
-    def __init__(self, config: Optional[GeoConfig] = None, **overrides: Any) -> None:
-        self.config = config or GeoConfig()
+    def __init__(self, config: Optional[GeoConfig | SageConfig] = None, **overrides: Any) -> None:
+        if isinstance(config, SageConfig):
+            self.config = GeoConfig(
+                min_tokens=config.chunk_min_tokens,
+                max_tokens=config.chunk_max_tokens,
+                overlap=config.chunk_overlap,
+                top_k=config.top_k,
+                backend=config.embedding_backend,
+                max_queries=config.max_sim_queries,
+                csp_prominence_weight=config.csp_prominence_weight,
+                csp_entropy_weight=config.csp_entropy_weight,
+                csp_pass_threshold=config.csp_pass_threshold,
+                csp_warn_threshold=config.csp_warn_threshold,
+            )
+        else:
+            self.config = config or GeoConfig()
         for key, value in overrides.items():
             if hasattr(self.config, key):
                 setattr(self.config, key, value)
@@ -495,7 +537,14 @@ class GeoAuditor:
         )
         embedder = resolve_backend(cfg.backend)
         queries = build_queries(snap, max_queries=cfg.max_queries)
-        simulation = simulate_rag(queries, chunks, embedder, top_k=cfg.top_k)
+        simulation = simulate_rag(
+            queries,
+            chunks,
+            embedder,
+            top_k=cfg.top_k,
+            prominence_weight=cfg.csp_prominence_weight,
+            entropy_weight=cfg.csp_entropy_weight,
+        )
 
         compliant = [
             chunk for chunk in chunks
@@ -527,6 +576,14 @@ class GeoAuditor:
                 details="llms.txt and rag_ready_chunks.json synthesized and attached "
                 "to the report (use --save-artifacts to write them to disk).",
                 recommendation="",
+                evidence=EvidenceMetadata(
+                    level=EvidenceLevel.E0,
+                    evidence_type="deterministic_fact",
+                    source="Artifact Synthesis Engine Output (llms.txt, rag_ready_chunks.json)",
+                    ranking_factor_claim=False,
+                    signal_type="technical_fact",
+                    configurable=False,
+                ),
             ),
         ]
 
@@ -535,7 +592,9 @@ class GeoAuditor:
             "chunk_count": len(chunks),
             "chunk_token_counts": [c.token_count for c in chunks],
             "chunk_size_compliance": round(compliance, 3),
-            "citation_survival_probability": simulation.get("csp"),
+            "citation_survival_proxy": simulation.get("csp"),
+            "citation_survival_probability": simulation.get("csp"),  # backward compat alias
+            "csp_details": simulation.get("csp_details"),
             "avg_semantic_entropy": simulation.get("avg_entropy"),
             "retrieval_coverage": simulation.get("retrieval_coverage"),
             "embedding_backend": simulation.get("backend"),
@@ -557,6 +616,14 @@ class GeoAuditor:
 
     def _check_content_volume(self, snap: PageSnapshot) -> Finding:
         tokens = snap.token_count
+        evidence = EvidenceMetadata(
+            level=EvidenceLevel.E4,
+            evidence_type="industry_heuristic",
+            source="RAG Passage Extraction Token Floor Heuristic",
+            ranking_factor_claim=False,
+            signal_type="industry_heuristic",
+            configurable=True,
+        )
         score = min(1.0, tokens / 600.0)
         if tokens >= 600:
             status, rec = Status.PASS, ""
@@ -567,7 +634,7 @@ class GeoAuditor:
             )
         else:
             status, rec = Status.FAIL, (
-                "Below ~240 tokens there is effectively nothing to chunk or retrieve — "
+                "Below ~240 tokens there is minimal material to chunk or retrieve — "
                 "expand the factual body copy."
             )
         return Finding(
@@ -578,15 +645,24 @@ class GeoAuditor:
             weight=6.0,
             details=f"{tokens} approximate tokens of clean text.",
             recommendation=rec,
+            evidence=evidence,
         )
 
     def _check_chunkability(self, chunks: Sequence[Chunk]) -> Finding:
         count = len(chunks)
+        evidence = EvidenceMetadata(
+            level=EvidenceLevel.E4,
+            evidence_type="industry_heuristic",
+            source="Semantic Passage Segmentation Pattern for Dense Retrieval",
+            ranking_factor_claim=False,
+            signal_type="industry_heuristic",
+            configurable=True,
+        )
         if count >= 3:
             score, status, rec = 1.0, Status.PASS, ""
         elif count >= 1:
             score, status, rec = 0.5, Status.WARN, (
-                "Only 1–2 passages can be built; one thin chunk gives a retriever "
+                "Only 1–2 passages can be formed; a single thin chunk gives a retriever "
                 "a single, dilute target. Add headed sections with substance."
             )
         else:
@@ -601,12 +677,21 @@ class GeoAuditor:
             weight=8.0,
             details=f"{count} passage(s) formed (target: ≥3 coherent chunks).",
             recommendation=rec,
+            evidence=evidence,
         )
 
     def _check_chunk_shape(
         self, chunks: Sequence[Chunk], compliance: float, cfg: GeoConfig
     ) -> Finding:
         sizes = ", ".join(str(c.token_count) for c in chunks) or "—"
+        evidence = EvidenceMetadata(
+            level=EvidenceLevel.E4,
+            evidence_type="industry_heuristic",
+            source="Dense Embedding Token Window Envelope Heuristic",
+            ranking_factor_claim=False,
+            signal_type="industry_heuristic",
+            configurable=True,
+        )
         status = (
             Status.PASS if compliance >= 0.85
             else Status.WARN if compliance >= 0.5 and chunks
@@ -621,49 +706,69 @@ class GeoAuditor:
             details=f"{compliance:.0%} of chunks sit inside the "
             f"{cfg.min_tokens}–{cfg.max_tokens} token window (sizes: {sizes}).",
             recommendation="" if status is Status.PASS else
-            "Very short sections fragment embeddings; very long ones dilute them. "
-            "Group related sentences into 60–120 token passages.",
+            f"Very short sections fragment embeddings; very long ones dilute them. "
+            f"Group related sentences into {cfg.min_tokens}–{cfg.max_tokens} token passages.",
+            evidence=evidence,
         )
 
     def _check_citation_survival(self, simulation: dict[str, Any]) -> Finding:
         csp = simulation.get("csp")
+        evidence = EvidenceMetadata(
+            level=EvidenceLevel.E5,
+            evidence_type="experimental_hypothesis",
+            source="Molavi Citation Survival Proxy (VPA Formulation)",
+            ranking_factor_claim=False,
+            signal_type="heuristic_proxy",
+            configurable=True,
+        )
         if csp is None:
             return Finding(
                 check_id="geo.citation_survival",
-                title="Citation Survival Probability",
+                title="Citation Survival Proxy (CSP)",
                 status=Status.FAIL,
                 score=0.0,
                 weight=16.0,
                 details="RAG simulation could not run (no queries/chunks).",
                 recommendation="Provide extractable body text and a descriptive title/H1 "
                 "so retrieval can be simulated.",
+                evidence=evidence,
             )
-        if csp >= 70:
+        pass_th = self.config.csp_pass_threshold
+        warn_th = self.config.csp_warn_threshold
+        if csp >= pass_th:
             status, rec = Status.PASS, ""
-        elif csp >= 45:
+        elif csp >= warn_th:
             status, rec = Status.WARN, (
-                "Citations survive retrieval only sometimes. Sharpen the entity focus of "
+                "Citations survive retrieval only moderately in simulation. Sharpen the entity focus of "
                 "each heading's first passage so one chunk clearly wins each query."
             )
         else:
             status, rec = Status.FAIL, (
-                "Retrieval attention is diffuse — queries match many chunks almost "
-                "equally, so the odds any single passage gets cited are low. Consolidate "
-                "per-topic sections and front-load definitional sentences."
+                "Retrieval attention is diffuse — probe queries match multiple chunks almost "
+                "equally in vector space. Consolidate per-topic sections and front-load definitional sentences."
             )
         return Finding(
             check_id="geo.citation_survival",
-            title="Citation Survival Probability",
+            title="Citation Survival Proxy (CSP)",
             status=status,
             score=csp / 100.0,
             weight=16.0,
-            details=f"CSP {csp:.1f}% across {len(simulation.get('per_query', []))} "
-            "simulated RAG queries (prominence + low-entropy ranking).",
+            details=f"CSP {csp:.1f}/100 across {len(simulation.get('per_query', []))} "
+            "simulated RAG queries (heuristic proxy combining retrieval prominence and low softmax entropy; uncalibrated).",
             recommendation=rec,
+            evidence=evidence,
         )
 
     def _check_retrieval_focus(self, simulation: dict[str, Any]) -> Finding:
         entropy = simulation.get("avg_entropy")
+        evidence = EvidenceMetadata(
+            level=EvidenceLevel.E5,
+            evidence_type="experimental_hypothesis",
+            source="Softmax Semantic Entropy Focus Metric",
+            ranking_factor_claim=False,
+            signal_type="heuristic_proxy",
+            configurable=False,
+        )
         if entropy is None:
             return Finding(
                 check_id="geo.retrieval_focus",
@@ -673,6 +778,7 @@ class GeoAuditor:
                 weight=0.0 if not simulation.get("per_query") else 6.0,
                 details="Not computable without retrieval results.",
                 recommendation="",
+                evidence=evidence,
             )
         focus = 1.0 - entropy
         status = Status.PASS if entropy <= 0.45 else (Status.WARN if entropy <= 0.7 else Status.FAIL)
@@ -683,16 +789,25 @@ class GeoAuditor:
             score=focus,
             weight=6.0,
             details=f"Average normalized similarity entropy {entropy:.2f} "
-            f"(0 = laser-focused, 1 = uniform ambiguity).",
+            f"(0 = sharp focus, 1 = uniform ambiguity).",
             recommendation="" if status is Status.PASS else
-            "High entropy means the page's passages all look alike to the retriever — "
+            "High entropy means the page's passages appear undifferentiated to the retriever — "
             "differentiate sections around distinct sub-questions.",
+            evidence=evidence,
         )
 
     def _check_retrieval_coverage(
         self, simulation: dict[str, Any], chunks: Sequence[Chunk]
     ) -> Finding:
         coverage = simulation.get("retrieval_coverage")
+        evidence = EvidenceMetadata(
+            level=EvidenceLevel.E4,
+            evidence_type="industry_heuristic",
+            source="Corpus Coverage Diagnostic for Probe Query Set",
+            ranking_factor_claim=False,
+            signal_type="retrieval_coverage_diagnostic",
+            configurable=True,
+        )
         if coverage is None:
             return Finding(
                 check_id="geo.retrieval_coverage",
@@ -702,6 +817,7 @@ class GeoAuditor:
                 weight=6.0,
                 details="No chunks were ever retrieved.",
                 recommendation="Add substantive, query-aligned passages.",
+                evidence=evidence,
             )
         status = (
             Status.PASS if coverage >= 0.75
@@ -715,15 +831,24 @@ class GeoAuditor:
             score=coverage,
             weight=6.0,
             details=f"{coverage:.0%} of chunks appear in at least one top-k result "
-            f"({invisible} chunk(s) invisible).",
+            f"({invisible} chunk(s) unretrieved by probe queries).",
             recommendation="" if status is Status.PASS else
-            "Some passages are never retrieved — either merge them into stronger "
-            "sections or align them with real user questions.",
+            "Some passages are never retrieved by probe queries — either merge them into stronger "
+            "sections or align headings with explicit user queries.",
+            evidence=evidence,
         )
 
     def _backend_note(self, simulation: dict[str, Any], cfg: GeoConfig) -> Finding:
         backend = str(simulation.get("backend") or "hashing fallback")
         neural = "fastembed" in backend or "sentence-transformers" in backend
+        evidence = EvidenceMetadata(
+            level=EvidenceLevel.E0,
+            evidence_type="deterministic_fact",
+            source="Local Runtime Vector Environment Detection",
+            ranking_factor_claim=False,
+            signal_type="runtime_environment_fact",
+            configurable=False,
+        )
         return Finding(
             check_id="geo.embedding_backend",
             title="Embedding backend",
@@ -734,4 +859,5 @@ class GeoAuditor:
             recommendation="" if neural else
             "Install `sage-audit[embeddings]` (fastembed) for neural embeddings; the "
             "deterministic fallback is stable but lexical.",
+            evidence=evidence,
         )

@@ -475,7 +475,7 @@ def test_render_markdown(report):
     md = render_markdown(report)
     assert md.startswith("# 🧭 SAGE Audit")
     assert "Technical SEO" in md
-    assert "Citation Survival Probability" in md
+    assert "Citation Survival Proxy" in md
     assert "```json" in md
     assert "molavi.pro" in md
 
