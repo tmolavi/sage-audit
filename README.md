@@ -45,8 +45,6 @@ Classical SEO tools stop at title tags and page speed. They tell you *nothing* a
 | **2️⃣ Answer Engine Optimization (AEO)** | `aeo_auditor.py` | Recursive JSON-LD entity-graph validation (`Organization`, `Person`, `Product`, `Article`, `FAQPage`), entity completeness, `sameAs` authority signals (Wikidata, Wikipedia, Crunchbase, official profiles), FAQ structuring, machine-readable freshness, and **direct-answer density** of the first 50–70 words of every section |
 | **3️⃣ Generative Engine Optimization (GEO)** | `geo_auditor.py` | Semantic passage chunking (60–120 tokens), local vector embeddings with graceful fallback, in-memory RAG retrieval simulation, cosine-distance & semantic-entropy analysis, **Citation Survival Proxy (CSP)**, and auto-generation of `llms.txt` + `rag_ready_chunks.json` |
 
-### The 5-Layer GEO Pyramid
-
 ```text
                     ┌───────────────────────────────────────┐
           L5        │  CITATION SURVIVAL PROXY (CSP) +      │
@@ -66,6 +64,14 @@ Classical SEO tools stop at title tags and page speed. They tell you *nothing* a
                     │  boilerplate stripping (Trafilatura)  │
                     └───────────────────────────────────────┘
 ```
+
+### 🏆 Integration with Molavi AI Visibility Index (MAVI)
+`sage-audit` provides the foundational diagnostic signals (L1–L4) for the **Molavi AI Visibility Index (MAVI)**:
+- **L1 Technical Accessibility**: Assessed via SAGE SEO Auditor (robots.txt, clean DOM, headers).
+- **L2 Semantic Extractability**: Assessed via SAGE clean passage chunking & text-to-code ratio.
+- **L3 Entity Clarity**: Assessed via SAGE AEO JSON-LD entity graph validation.
+- **L4 Citation Readiness**: Assessed via SAGE Citation Survival Proxy (CSP).
+- **L5 Empirical AI Visibility**: Assessed via [GEO-Scope](https://github.com/tmolavi/geo-scope) multi-model live benchmark observations across real generative engines.
 
 ## Installation
 
