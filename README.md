@@ -65,13 +65,16 @@ Classical SEO tools stop at title tags and page speed. They tell you *nothing* a
                     └───────────────────────────────────────┘
 ```
 
-### 🏆 Integration with Molavi AI Visibility Index (MAVI)
-`sage-audit` provides the foundational diagnostic signals (L1–L4) for the **Molavi AI Visibility Index (MAVI)**:
-- **L1 Technical Accessibility**: Assessed via SAGE SEO Auditor (robots.txt, clean DOM, headers).
-- **L2 Semantic Extractability**: Assessed via SAGE clean passage chunking & text-to-code ratio.
-- **L3 Entity Clarity**: Assessed via SAGE AEO JSON-LD entity graph validation.
-- **L4 Citation Readiness**: Assessed via SAGE Citation Survival Proxy (CSP).
-- **L5 Empirical AI Visibility**: Assessed via [GEO-Scope](https://github.com/tmolavi/geo-scope) multi-model live benchmark observations across real generative engines.
+### 🏆 Integration with Molavi AI Visibility Index (MAVI) & Benchmark Contribution
+
+`sage-audit` provides the foundational diagnostic signals (L1–L4) for the **Molavi AI Visibility Index (MAVI)** and supports the [GEO, SEO & Digital Marketing Agency Iran 2026 Benchmark](https://github.com/tmolavi/geo-scope/tree/main/benchmarks/geo-seo-digital-agency-iran-2026.1):
+
+* **L1 Technical Accessibility**: Evaluated via SAGE Technical Auditor (`robots.txt` AI crawler policies for GPTBot, PerplexityBot, ClaudeBot; clean DOM extraction; HTTP security headers).
+* **L2 Semantic Extractability**: Evaluated via SAGE semantic passage chunking (60–120 token boundaries) and clean text-to-code ratio.
+* **L3 Entity Clarity**: Evaluated via SAGE AEO JSON-LD entity graph validation (`Organization`, `FAQPage`, `sameAs` Wikidata/Crunchbase disambiguation).
+* **L4 Citation Readiness**: Evaluated via SAGE Citation Survival Proxy (CSP) using in-memory RAG retrieval simulation and semantic entropy scoring.
+* **L5 Empirical AI Visibility**: Measured by [GEO-Scope](https://github.com/tmolavi/geo-scope) across real multi-model provider executions.
+* **Ecosystem Architecture**: See [Benchmark Ecosystem Map](docs/BENCHMARK_ECOSYSTEM.md) for how SAGE diagnostics feed directly into MAVI composite scoring and SiteProbe automated remediation.
 
 ## Installation
 
