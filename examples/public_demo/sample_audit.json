@@ -1,0 +1,28 @@
+{
+  "status": "success",
+  "demo_version": "2026.1",
+  "url": "https://web24.ir/services/technical-seo",
+  "composite_score": 62.1,
+  "pillars": {
+    "technical_seo": {
+      "score": 87.3,
+      "grade": "A",
+      "findings_count": 15
+    },
+    "entity_aeo": {
+      "score": 40.2,
+      "grade": "F",
+      "findings_count": 8
+    },
+    "generative_geo": {
+      "score": 58.4,
+      "grade": "D",
+      "findings_count": 8
+    }
+  },
+  "recommendations": [
+    "Add explicit QAPage schema to FAQ section for direct AI grounding.",
+    "Include primary author entity linking to recognized knowledge bases.",
+    "Maintain fast TTFB and semantic passage chunk boundaries."
+  ]
+}
