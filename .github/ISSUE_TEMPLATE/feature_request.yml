@@ -1,0 +1,18 @@
+name: Feature request
+description: Suggest an idea or new diagnostic capability
+body:
+  - type: textarea
+    id: feature-description
+    attributes:
+      label: Feature Description
+      description: Clear explanation of proposed diagnostic or audit capability
+      placeholder: Describe the feature...
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Problem Solved
+      description: What diagnostic or AEO/GEO problem does this address?
+    validations:
+      required: true

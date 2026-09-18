@@ -1,0 +1,24 @@
+name: Bug report
+description: Create a report to help us improve
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for reporting an issue with SAGE Audit!
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Describe the issue encountered
+      placeholder: Error details or unexpected output...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Provide URL or HTML snippet to reproduce
+      placeholder: |
+        1. Run `sage https://...`
+        2. See error...
+    validations:
+      required: true

@@ -76,6 +76,24 @@ Classical SEO tools stop at title tags and page speed. They tell you *nothing* a
 * **L5 Empirical AI Visibility**: Measured by [GEO-Scope](https://github.com/tmolavi/geo-scope) across real multi-model provider executions.
 * **Ecosystem Architecture**: See [Benchmark Ecosystem Map](docs/BENCHMARK_ECOSYSTEM.md) for how SAGE diagnostics feed directly into MAVI composite scoring and SiteProbe automated remediation.
 
+## 🏛️ Ecosystem
+
+SAGE Audit operates as the static diagnostic component of the **Molavi AI Visibility Stack**:
+
+- **Discovery**: [AnswerPath GEO](https://github.com/tmolavi/answerpath-geo)
+- **Measurement**: [GEO-Scope](https://github.com/tmolavi/geo-scope)
+- **Diagnostics**: [SAGE Audit](https://github.com/tmolavi/sage-audit)
+- **Action**: [SiteProbe](https://github.com/tmolavi/siteprobe)
+- **Protocol**: [MCP GEO Server](https://github.com/tmolavi/mcp-geo-server)
+
+## 📖 Runnable Python Example
+
+Run the bundled 3-pillar audit script:
+```bash
+python examples/audit_example.py
+```
+A complete JSON audit output sample is available at [`examples/example_audit.json`](examples/example_audit.json).
+
 ## Installation
 
 ```bash

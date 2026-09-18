@@ -1,0 +1,40 @@
+{
+  "url": "https://example.com",
+  "audited_at": "2026-09-18T00:00:00Z",
+  "score": 88,
+  "grade": "B+",
+  "pillars": {
+    "technical_seo": {
+      "score": 92,
+      "status": "PASS",
+      "crawler_access": {
+        "gptbot": "ALLOWED",
+        "perplexitybot": "ALLOWED",
+        "claudebot": "ALLOWED"
+      },
+      "canonical_valid": true,
+      "dom_hygiene": "CLEAN"
+    },
+    "entity_aeo": {
+      "score": 85,
+      "status": "PASS",
+      "schemas_detected": ["Organization", "FAQPage", "WebSite"],
+      "same_as_authorities": ["https://www.wikidata.org/wiki/Q12345"],
+      "direct_answer_density": 0.78
+    },
+    "geo_readiness": {
+      "score": 87,
+      "status": "PASS",
+      "citation_survival_proxy": 0.84,
+      "semantic_entropy": 0.22,
+      "llms_txt_present": true,
+      "rag_chunk_count": 14
+    }
+  },
+  "mavi_contribution": {
+    "l1_technical_accessibility": 92.0,
+    "l2_semantic_extractability": 86.0,
+    "l3_entity_clarity": 85.0,
+    "l4_citation_readiness": 87.0
+  }
+}
