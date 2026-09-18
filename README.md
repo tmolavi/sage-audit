@@ -535,6 +535,16 @@ Resmî PyPI yayını için:
 
 SAGE; sinirsel gömme modeli bulunamadığında otomatik olarak deterministik n-gram vektörleştiriciye geçer — araç **asla çökmez**, sonuçlar her zaman tekrar üretilebilirdir.
 
+## 💬 Community & External Collaboration
+
+We welcome researchers and engineers contributing to multi-pillar diagnostic algorithms and evidence taxonomies:
+
+- **Discussions**: [GitHub Discussions](https://github.com/tmolavi/sage-audit/discussions) across General, Research, Ideas, Help, and Show & Tell.
+- **First Contribution Guide**: [`docs/FIRST_CONTRIBUTION.md`](docs/FIRST_CONTRIBUTION.md)
+- **Methodology & CSP Formalization**: [`docs/methodology.md`](docs/methodology.md)
+- **Report Issues**: [GitHub Issues](https://github.com/tmolavi/sage-audit/issues)
+- **Contribution Standards**: [`CONTRIBUTING.md`](CONTRIBUTING.md) and [`SECURITY.md`](SECURITY.md)
+
 ---
 
 <div align="center">
