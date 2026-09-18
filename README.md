@@ -216,6 +216,14 @@ Or without installing, via `uvx`:
 }
 ```
 
+## 🔬 Evidence & Diagnostic Benchmarks
+
+- **Sample Diagnostic Audit Output**: [`examples/example_audit.json`](examples/example_audit.json)
+- **Standalone Offline Diagnostic Demo**: [`examples/public_demo/`](examples/public_demo/)
+- **Mathematical Specification & Taxonomy**: [`docs/methodology.md`](docs/methodology.md)
+- **Ecosystem Data Flow & Contracts**: [`docs/BENCHMARK_ECOSYSTEM.md`](docs/BENCHMARK_ECOSYSTEM.md)
+- **Cross-Repository Evidence Map**: [Ecosystem Evidence Flow](https://github.com/tmolavi/geo-scope/blob/main/docs/EVIDENCE_MAP.md)
+
 ## Scoring Model & Epistemic Evidence Taxonomy
 
 - Every check is a weighted **Finding** tagged with structured epistemic **Evidence Taxonomy (E0–E5)** metadata:
