@@ -369,14 +369,14 @@ This repository already ships
 official [`pypa/gh-action-pypi-publish`](https://github.com/pypa/gh-action-pypi-publish)
 action over GitHub OIDC — **no token is ever stored anywhere**.
 
-One-time setup (PyPI side):
+The PyPI-side project publisher is already configured with:
 
-1. Go to [pypi.org/manage/account/publishing](https://pypi.org/manage/account/publishing/)
-   → **Add a new pending publisher** and enter:
-   - PyPI project name: `sage-audit`
-   - Owner: `tmolavi` · Repository: `sage-audit`
-   - Workflow filename: `publish.yml`
-2. Cut a release on GitHub (*Releases → Draft a new release → tag the matching version*):
+- Owner: `tmolavi` · Repository: `sage-audit`
+- Workflow filename: `publish.yml`
+- GitHub environment: `pypi`
+
+To publish a new version, update the package version, push the changes, and
+cut a release on GitHub (*Releases → Draft a new release → tag the matching version*):
    the workflow builds the wheel + sdist and publishes them automatically —
    every future release is a one-click PyPI publish.
 
@@ -448,7 +448,7 @@ sage benchmark run --suite resource --runs 20 --public-claim
 sage benchmark reproduce results/resource_eval_public_test/2026-10-02/manifest.json
 ```
 
-> **🚧 هنوز روی PyPI منتشر نشده؟** تا قبل از اولین انتشار رسمی (راهنمای گام‌به‌گام در بخش *انتشار روی PyPI* پایین‌تر)، مستقیم از ریپو نصب کنید:
+> برای تغییرات توسعه‌ای و نسخه‌های منتشرنشده، می‌توانید مستقیماً از ریپو نصب کنید:
 >
 > ```bash
 > pip install git+https://github.com/tmolavi/sage-audit.git
@@ -456,7 +456,7 @@ sage benchmark reproduce results/resource_eval_public_test/2026-10-02/manifest.j
 
 ### انتشار روی PyPI (اختیاری — راهنمای گام‌به‌گام نگهدارنده)
 
-دو مقصد انتشار را با هم اشتباه نکنید: **گیت‌هاب** (سورس‌کد — منتشر شده ✅) و **PyPI** (پکیج `pip` روی pypi.org — نیازمند اکانت جدا و یک‌بار راه‌اندازی ⏳). پوش کردن کد به گیت‌هاب به‌هیچ‌وجه پکیج pip منتشر نمی‌کند.
+دو مقصد انتشار را با هم اشتباه نکنید: **گیت‌هاب** (سورس‌کد) و **PyPI** (پکیج `pip` روی pypi.org). پوش کردن کد به گیت‌هاب به‌تنهایی پکیج pip منتشر نمی‌کند؛ برای انتشار، یک GitHub Release منتشرشده بسازید.
 
 تا قبل از اولین انتشار رسمی، هر کسی می‌تواند مستقیم از ریپو نصب کند:
 
@@ -464,7 +464,7 @@ sage benchmark reproduce results/resource_eval_public_test/2026-10-02/manifest.j
 pip install git+https://github.com/tmolavi/sage-audit.git
 ```
 
-برای انتشار رسمی روی PyPI:
+برای انتشار رسمی روی PyPI، روش پیشنهادی Trusted Publishing است:
 
 1. **ساخت اکانت PyPI** — در [pypi.org/account/register](https://pypi.org/account/register/) ثبت‌نام کنید، ایمیل را تأیید و **احراز هویت دو مرحله‌ای (2FA)** را فعال کنید (بدون 2FA پلتفرم اجازهٔ آپلود نمی‌دهد).
 2. **ساخت API Token** — در [pypi.org/manage/account/token](https://pypi.org/manage/account/token/) روی *Add API token* بزنید. چون پروژه هنوز روی PyPI وجود ندارد، scope اولین توکن باید **«Entire account»** باشد (توکن پروژه‌محور فقط بعد از اولین آپلود قابل ساخت است). توکن با `pypi-` شروع می‌شود و مثل رمز عبور محرمانه است.
@@ -479,7 +479,7 @@ pip install git+https://github.com/tmolavi/sage-audit.git
 4. **کنترل نهایی** — صفحهٔ [pypi.org/project/sage-audit](https://pypi.org/project/sage-audit/) را باز کنید؛ از این لحظه `pip install sage-audit` در سراسر جهان کار می‌کند.
 5. **امنیت** — بلافاصله بعد از آپلود، توکن را **Revoke** کنید (یا یک توکن جدید *پروژه‌محور* با تاریخ انقضای کوتاه بسازید). توکن را هرگز داخل git کامیت نکنید.
 
-**مسیر جایگزین بدون توکن (Trusted Publishing):** فایل آمادهٔ [`.github/workflows/publish.yml`](.github/workflows/publish.yml) در ریپو موجود است؛ کافی است یک‌بار در [تنظیمات Publishing اکانت PyPI](https://pypi.org/manage/account/publishing/) گیت‌هاب (Owner: `tmolavi`، Repo: `sage-audit`، Workflow: `publish.yml`) را به‌عنوان Trusted Publisher معرفی کنید — از آن به بعد هر **Release** جدید روی گیت‌هاب، به‌طور خودکار روی PyPI منتشر می‌شود، بدون اینکه هیچ توکنی در جایی ذخیره شود.
+فایل آمادهٔ [`.github/workflows/publish.yml`](.github/workflows/publish.yml) از GitHub OIDC استفاده می‌کند. Publisher پروژه در PyPI به Owner: `tmolavi`، Repo: `sage-audit`، Workflow: `publish.yml` و Environment: `pypi` متصل است. از این به بعد هر **GitHub Release** منتشرشده، به‌طور خودکار روی PyPI منتشر می‌شود، بدون اینکه هیچ توکنی در GitHub ذخیره شود.
 
 ### تضمین پایداری
 
@@ -548,7 +548,7 @@ sage benchmark run --suite resource --runs 20 --public-claim
 sage benchmark reproduce results/resource_eval_public_test/2026-10-02/manifest.json
 ```
 
-> **🚧 Henüz PyPI'de yok mu?** İlk resmî PyPI sürümüne kadar (aşağıdaki kılavuz) doğrudan depodan kurun:
+> Geliştirme değişiklikleri ve yayımlanmamış sürümler için doğrudan depodan kurabilirsiniz:
 >
 > ```bash
 > pip install git+https://github.com/tmolavi/sage-audit.git
@@ -556,7 +556,7 @@ sage benchmark reproduce results/resource_eval_public_test/2026-10-02/manifest.j
 
 ### PyPI'de Yayınlama (İsteğe Bağlı — Adım Adım Kılavuz)
 
-İki yayın hedefini karıştırmayın: **GitHub** (kaynak kodu — yayınlandı ✅) ve **PyPI** (pypi.org'daki `pip` paketi — ayrı hesap ve tek seferlik kurulum gerekir ⏳). Kodu GitHub'a push etmek, asla bir pip paketi yayınlamaz.
+İki yayın hedefini karıştırmayın: **GitHub** (kaynak kodu) ve **PyPI** (pypi.org'daki `pip` paketi). GitHub'a push etmek tek başına bir pip paketi yayınlamaz; yayımlanmış bir GitHub Release oluşturmanız gerekir.
 
 İlk resmî PyPI sürümünden önce herkes doğrudan depodan kurabilir:
 
@@ -579,7 +579,7 @@ Resmî PyPI yayını için:
 4. **Doğrulama** — [pypi.org/project/sage-audit](https://pypi.org/project/sage-audit/) sayfasını açıp `pip install sage-audit` komutunu test edin; artık tüm dünyada çalışır.
 5. **Güvenlik** — yüklemeden hemen sonra tokenı **revoke** edin (ya da yalnızca bu projeye özel, kısa süreli bir token oluşturun). Tokenı asla git'e commit etmeyin.
 
-**Tokensiz alternatif (Trusted Publishing):** depoda hazır bulunan [`.github/workflows/publish.yml`](.github/workflows/publish.yml) dosyası sayesinde; [PyPI Publishing ayarlarından](https://pypi.org/manage/account/publishing/) `tmolavi/sage-audit` (workflow: `publish.yml`) bir kez Trusted Publisher olarak tanımlandığında, bundan sonraki her GitHub **Release**'i otomatik olarak PyPI'de yayınlanır — hiçbir token saklanmadan.
+**Trusted Publishing (önerilen, tokensiz):** depoda hazır bulunan [`.github/workflows/publish.yml`](.github/workflows/publish.yml) dosyası GitHub OIDC kullanır. PyPI Publisher ayarı `tmolavi/sage-audit` (workflow: `publish.yml`, environment: `pypi`) olarak yapılandırılmıştır; bundan sonraki her yayımlanmış GitHub **Release** otomatik olarak PyPI'de yayınlanır.
 
 ### Geliştirici
 
