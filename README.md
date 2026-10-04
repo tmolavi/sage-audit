@@ -37,6 +37,9 @@ Classical SEO tools stop at title tags and page speed. They tell you *nothing* a
 
 **SAGE (`sage-audit`) closes that gap.** One open-source engine, three pillars, four interfaces (CLI · Python library · MCP server · JSON/Markdown exports).
 
+> **Positioning & Ecosystem Role:**  
+> **SAGE** focuses on static SEO/AEO/GEO diagnostics, analysis, and intelligence extraction (to **understand and diagnose**). For active multi-page crawling and automated source-code remediation, see [**SiteProbe**](https://github.com/tmolavi/siteprobe) (to **crawl, analyze, and remediate**).
+
 ## The 3 Pillars
 
 | Pillar | Module | What it measures |
@@ -82,8 +85,8 @@ SAGE Audit operates as the static diagnostic component of the **Molavi AI Visibi
 
 - **Discovery**: [AnswerPath GEO](https://github.com/tmolavi/answerpath-geo)
 - **Measurement**: [GEO-Scope](https://github.com/tmolavi/geo-scope)
-- **Diagnostics**: [SAGE Audit](https://github.com/tmolavi/sage-audit)
-- **Action**: [SiteProbe](https://github.com/tmolavi/siteprobe)
+- **Diagnostics**: [SAGE Audit](https://github.com/tmolavi/sage-audit) *(understand & diagnose)*
+- **Action**: [SiteProbe](https://github.com/tmolavi/siteprobe) *(crawl & remediate)*
 - **Protocol**: [MCP GEO Server](https://github.com/tmolavi/mcp-geo-server)
 
 ## 📖 Runnable Python Example
@@ -96,26 +99,23 @@ A complete JSON audit output sample is available at [`examples/example_audit.jso
 
 ## Installation
 
+### Install from Source / Repository (Pre-release)
+
 ```bash
-pip install sage-audit
+# Standard installation from GitHub
+pip install git+https://github.com/tmolavi/sage-audit.git
 
-# recommended: local neural embeddings for the GEO pillar
-pip install "sage-audit[embeddings]"
+# Recommended: with local neural embeddings for the GEO pillar
+pip install "sage-audit[embeddings] @ git+https://github.com/tmolavi/sage-audit.git"
 
-# MCP server for Claude Desktop / Cursor / AI agents
-pip install "sage-audit[mcp]"
+# With MCP server for Claude Desktop / Cursor / AI agents
+pip install "sage-audit[mcp] @ git+https://github.com/tmolavi/sage-audit.git"
 
-# everything at once
-pip install "sage-audit[all]"
+# Everything at once
+pip install "sage-audit[all] @ git+https://github.com/tmolavi/sage-audit.git"
 ```
 
-> **🚧 Not on PyPI yet?** Until the first PyPI release is cut (step-by-step runbook in
-> **[Distribution & Publishing](#-distribution--publishing)** below), install
-> straight from the repository:
->
-> ```bash
-> pip install git+https://github.com/tmolavi/sage-audit.git
-> ```
+> **PyPI:** Install the latest stable release directly with `pip install sage-audit`.
 
 > **Zero-crash guarantee:** if no neural embedding package is installed (or a model download fails), the GEO pillar silently falls back to a deterministic hashed n-gram TF vectorizer. Results stay stable and reproducible — the tool *never* crashes.
 
@@ -218,11 +218,30 @@ Or without installing, via `uvx`:
 
 ## 🔬 Evidence & Diagnostic Benchmarks
 
+- **Reproducibility Protocol**: [`docs/reproducibility-protocol.md`](docs/reproducibility-protocol.md)
 - **Sample Diagnostic Audit Output**: [`examples/example_audit.json`](examples/example_audit.json)
 - **Standalone Offline Diagnostic Demo**: [`examples/public_demo/`](examples/public_demo/)
 - **Mathematical Specification & Taxonomy**: [`docs/methodology.md`](docs/methodology.md)
 - **Ecosystem Data Flow & Contracts**: [`docs/BENCHMARK_ECOSYSTEM.md`](docs/BENCHMARK_ECOSYSTEM.md)
 - **Cross-Repository Evidence Map**: [Ecosystem Evidence Flow](https://github.com/tmolavi/geo-scope/blob/main/docs/EVIDENCE_MAP.md)
+
+## 📊 Benchmark & Reproducibility Protocol
+
+To prevent non-reproducible AI benchmark claims and account for evaluation stochasticity, SAGE enforces a formal statistical reproducibility pipeline (full specification: [`docs/reproducibility-protocol.md`](docs/reproducibility-protocol.md)):
+
+- **Minimum $N \ge 20$ Repeated Runs**: Any public comparative claim requires at least 20 repeated runs (`--public-claim`), while fast single runs remain available for local development and CI testing.
+- **Statistical Rigor**: Computes 95% Wilson Score Confidence Intervals for success rates and 95% non-parametric bootstrap confidence intervals ($B=2000$) for latency. If confidence intervals overlap, claims of superiority are disallowed.
+- **18-Field Telemetry & Provenance**: Every observation records 18 standard fields (`benchmark_id`, `task_id`, `run_id`, `pass`, `raw_score`, `model`, `provider`, `model_version_if_available`, `framework_or_agent_version`, `temperature`, `timestamp`, `latency_ms`, `input_tokens`, `output_tokens`, `estimated_cost_usd`, `tool_calls`, `config_hash`, `git_sha`, `raw_evidence_path`).
+- **Complete Run Preservation**: Artifacts are saved under `results/<benchmark>/<run-date>/` (`manifest.json`, `observations.jsonl`, `summary.csv`), ensuring `summary.csv` is 100% mathematically recoverable from `observations.jsonl`.
+- **1-Command Reproduction**: Any researcher can verify or re-run a benchmark from its pinned manifest.
+
+```bash
+# Run benchmark with public claim validation (20 runs + Wilson/Bootstrap CIs)
+sage benchmark run --suite resource --runs 20 --public-claim
+
+# Reproduce any past benchmark run from its pinned manifest
+sage benchmark reproduce results/resource_eval_public_test/2026-10-02/manifest.json
+```
 
 ## Scoring Model & Epistemic Evidence Taxonomy
 
@@ -251,15 +270,20 @@ sage-audit/
 ├── requirements.txt
 ├── .gitignore
 ├── docs/
-│   └── methodology.md          # Full Evidence Taxonomy & CSP specification
+│   ├── methodology.md          # Full Evidence Taxonomy & CSP specification
+│   ├── reproducibility-protocol.md # Statistical benchmark protocol (Wilson/Bootstrap CI)
+│   └── BENCHMARK_ECOSYSTEM.md  # Ecosystem data flow & contracts
+├── results/                    # Reproducible benchmark manifests & observations
 ├── src/
 │   └── sage_audit/
-│       ├── __init__.py         # exports SageAuditor, models, validation, __version__
+│       ├── __init__.py         # exports SageAuditor, evaluation, validation, __version__
 │       ├── _version.py         # single source of truth
 │       ├── config.py           # SageConfig & configurable heuristic thresholds
 │       ├── models.py           # pydantic schemas (EvidenceMetadata, CspDetails, Reports)
+│       ├── evaluation.py       # Benchmark runner, 18-field telemetry, Wilson/Bootstrap CI
+│       ├── memory_eval.py      # SAGE Memory benchmark suite
 │       ├── validation.py       # Spearman, AUROC, Precision@k, Brier score, calibration
-│       ├── cli.py              # sage audit | generate-llms | validate | mcp
+│       ├── cli.py              # sage audit | generate-llms | validate | benchmark | mcp
 │       ├── core.py             # SAGE orchestrator (0.30/0.35/0.35 configurable fusion)
 │       ├── auditors/
 │       │   ├── __init__.py
@@ -280,6 +304,7 @@ sage-audit/
 │   ├── test_taxonomy.py        # Evidence taxonomy & ranking claims tests
 │   ├── test_csp_hardening.py   # Hardened CSP proxy semantics tests
 │   ├── test_validation.py      # Statistical validation & calibration tests
+│   ├── test_reproducibility_protocol.py # 20-run, Wilson/Bootstrap CI, manifest pinning tests
 │   └── test_config.py          # Heuristic threshold override tests
 └── README.md
 ```
@@ -300,9 +325,9 @@ pytest -q
 | Target | What it is | Status |
 | --- | --- | --- |
 | **GitHub** | Public source-code repository | ✅ **Published** — [github.com/tmolavi/sage-audit](https://github.com/tmolavi/sage-audit) |
-| **PyPI** | The `pip install sage-audit` package on pypi.org | ⏳ Pending one-time maintainer step (below) |
+| **PyPI** | The `pip install sage-audit` package on pypi.org | ✅ Published — stable distribution |
 
-> ⚠️ **Until the first PyPI release**, SAGE is installed directly from the repo:
+> For contributors and unreleased changes, SAGE can also be installed directly from the repo:
 >
 > ```bash
 > pip install git+https://github.com/tmolavi/sage-audit.git
@@ -310,7 +335,7 @@ pytest -q
 > pip install "sage-audit[all] @ git+https://github.com/tmolavi/sage-audit.git"
 > ```
 
-### Path A — Manual PyPI publish (≈5 minutes)
+### Path A — PyPI release maintenance
 
 GitHub and PyPI are **separate services**: pushing code to GitHub never
 publishes a pip package. To put `sage-audit` on PyPI the maintainer must:
@@ -320,16 +345,15 @@ publishes a pip package. To put `sage-audit` on PyPI the maintainer must:
    (PyPI refuses uploads from accounts without 2FA).
 2. **Mint an API token** at [pypi.org/manage/account/token](https://pypi.org/manage/account/token/)
    → *Add API token*.
-   - The project does not exist on PyPI yet, so the **first token must be
-     scoped "Entire account"** — project-scoped tokens only become available
-     *after* the first upload.
+   - For routine releases, use a short-lived project-scoped token or the
+     repository's Trusted Publishing workflow.
    - The token starts with `pypi-` — treat it like a password and never
      commit it to git.
 3. **Build & upload** from the repo root:
 
    ```bash
    pip install --upgrade build twine
-   python -m build        # → dist/sage_audit-1.0.0-py3-none-any.whl + .tar.gz
+   python -m build        # → dist/sage_audit-<version>-py3-none-any.whl + .tar.gz
    twine upload dist/*    # username: __token__    password: pypi-...
    ```
 
@@ -352,7 +376,7 @@ One-time setup (PyPI side):
    - PyPI project name: `sage-audit`
    - Owner: `tmolavi` · Repository: `sage-audit`
    - Workflow filename: `publish.yml`
-2. Cut a release on GitHub (*Releases → Draft a new release → tag `v1.0.0`*):
+2. Cut a release on GitHub (*Releases → Draft a new release → tag the matching version*):
    the workflow builds the wheel + sdist and publishes them automatically —
    every future release is a one-click PyPI publish.
 
@@ -405,6 +429,23 @@ sage audit https://molavi.pro --format markdown -o report.md --save-artifacts ./
 sage generate-llms https://molavi.pro -o llms.txt --also-chunks
 sage audit https://molavi.pro --fail-under 70   # دروازهٔ کیفی در CI
 sage mcp                                        # اتصال به Claude Desktop / Cursor
+```
+
+### 📊 پروتکل بازتولیدپذیری و بنچ‌مارک‌های آماری SAGE
+
+برای جلوگیری از ادعاهای غیرقابل اثبات و نوسانات تصادفی مدل‌های هوش مصنوعی، موتور SAGE به یک پروتکل استاندارد بازتولیدپذیری و اعتبارسنجی آماری مجهز است ([مستندات کامل در docs/reproducibility-protocol.md](docs/reproducibility-protocol.md)):
+
+- **حداقل ۲۰ تکرار برای ادعاهای عمومی (`--public-claim`)**: هرگونه ادعای مقایسه‌ای عمومی مستلزم حداقل ۲۰ بار اجرای تکراری مستقل است؛ در حالی که برای تست‌های سریع توسعه اجرای تک‌باره همچنان مجاز است.
+- **دقت آماری (فاصله‌های اطمینان ۹۵٪ ویلسون و بوت‌استرپ)**: نرخ موفقیت با فاصلهٔ اطمینان ۹۵٪ Wilson Score و توزیع تأخیر با فاصله اطمینان ۹۵٪ بوت‌استرپ ناپارامتریک محاسبه می‌شود. در صورت هم‌پوشانی بازه‌های اطمینان، برتری قاطعی اعلام نمی‌شود.
+- **ثبت شواهد خام ۱۸ فیلدی و مانیفست تبارشناسی**: تمام مشاهدات در ساختار `results/<benchmark>/<date>/` با فرمت‌های `manifest.json`، `observations.jsonl` و `summary.csv` ذخیره شده و امکان استخراج و بررسی ۱:۱ دارند.
+- **دستور سادهٔ بازتولید (Reproduction)**:
+
+```bash
+# اجرای بنچ‌مارک با اعتبارسنجی آماری ادعای عمومی (۲۰ تکرار)
+sage benchmark run --suite resource --runs 20 --public-claim
+
+# بازتولید و اعتبارسنجی یک اجرای گذشته از طریق فایل مانیفست
+sage benchmark reproduce results/resource_eval_public_test/2026-10-02/manifest.json
 ```
 
 > **🚧 هنوز روی PyPI منتشر نشده؟** تا قبل از اولین انتشار رسمی (راهنمای گام‌به‌گام در بخش *انتشار روی PyPI* پایین‌تر)، مستقیم از ریپو نصب کنید:
@@ -488,6 +529,23 @@ sage audit https://ornek-siteniz.com --format markdown -o rapor.md --save-artifa
 sage generate-llms https://ornek-siteniz.com -o llms.txt --also-chunks
 sage audit https://ornek-siteniz.com --fail-under 70   # CI kalite kapısı
 sage mcp                                               # Claude Desktop / Cursor bağlantısı
+```
+
+### 📊 SAGE Karşılaştırmalı Değerlendirme ve Yeniden Üretilebilirlik Protokolü
+
+Tek çalıştırmalı testlerdeki gürültüyü ve dayanaksız karşılaştırmalı iddiaları önlemek amacıyla SAGE, istatistiksel olarak doğrulanabilir bir değerlendirme hattı sunar ([ayrıntılı kılavuz: docs/reproducibility-protocol.md](docs/reproducibility-protocol.md)):
+
+- **Kamuya Açık İddialar İçin Minimum 20 Tekrar (`--public-claim`)**: Karşılaştırmalı tüm kamu iddiaları en az 20 bağımsız çalıştırma gerektirir; yerel geliştirmede ise hızlı tek çalıştırmalar desteklenir.
+- **İstatistiksel Güven Aralıkları (%95 Wilson ve Bootstrap CI)**: Başarı oranı %95 Wilson Skor Güven Aralığı ile, gecikmeler ise parametrik olmayan bootstrap (%95 CI) ile hesaplanır. Güven aralıkları örtüşüyorsa kesin üstünlük ilan edilmez.
+- **18 Alanlı Ham Kanıt Şeması ve Tam Köken Takibi**: Her gözlem `results/<benchmark>/<tarih>/` dizininde `manifest.json`, `observations.jsonl` ve `summary.csv` olarak kaydedilir.
+- **Tek Komutla Yeniden Üretim**:
+
+```bash
+# Kamuya açık iddia protokolü ile 20 tekrarlı çalıştırma
+sage benchmark run --suite resource --runs 20 --public-claim
+
+# Manifest dosyası üzerinden geçmiş çalıştırmayı yeniden üretme
+sage benchmark reproduce results/resource_eval_public_test/2026-10-02/manifest.json
 ```
 
 > **🚧 Henüz PyPI'de yok mu?** İlk resmî PyPI sürümüne kadar (aşağıdaki kılavuz) doğrudan depodan kurun:
