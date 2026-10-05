@@ -70,7 +70,7 @@ Classical SEO tools stop at title tags and page speed. They tell you *nothing* a
 
 ### 🏆 Integration with Molavi AI Visibility Index (MAVI) & Benchmark Contribution
 
-`sage-audit` provides the foundational diagnostic signals (L1–L4) for the **Molavi AI Visibility Index (MAVI)** and supports the [GEO, SEO & Digital Marketing Agency Iran 2026 Benchmark](https://github.com/tmolavi/geo-scope/tree/main/benchmarks/geo-seo-digital-agency-iran-2026.1):
+`sage-audit` provides the foundational diagnostic signals (L1–L4) for the **Molavi AI Visibility Index (MAVI)** and supports the [GEO, SEO & Digital Marketing Agency Iran 2026 Benchmark](https://github.com/tmolavi/geo-scope/tree/main/benchmark/releases/geo-seo-digital-agency-iran-2026.1):
 
 * **L1 Technical Accessibility**: Evaluated via SAGE Technical Auditor (`robots.txt` AI crawler policies for GPTBot, PerplexityBot, ClaudeBot; clean DOM extraction; HTTP security headers).
 * **L2 Semantic Extractability**: Evaluated via SAGE semantic passage chunking (60–120 token boundaries) and clean text-to-code ratio.
