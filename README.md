@@ -13,7 +13,7 @@
 
 **Inspect any URL or raw HTML and score it for the era of AI answers — from classical technical SEO to JSON-LD entity graphs to RAG Citation Survival Probability — in one deterministic, crash-proof command.**
 
-[English](#-english) · [فارسی](#-فارسی) · [Türkçe](#-türkçe)
+[English](#-english) · [فارسی](#-فارسی) · [Türkçe](#-türkçe) · [Azərbaycan dili](README.az.md) · [العربية](README.ar.md)
 
 </div>
 
@@ -218,16 +218,16 @@ Or without installing, via `uvx`:
 
 ## 🔬 Evidence & Diagnostic Benchmarks
 
-- **Reproducibility Protocol**: [`docs/reproducibility-protocol.md`](docs/reproducibility-protocol.md)
+- **Methodology and reproducibility**: [`docs/methodology.md`](docs/methodology.md)
 - **Sample Diagnostic Audit Output**: [`examples/example_audit.json`](examples/example_audit.json)
-- **Standalone Offline Diagnostic Demo**: [`examples/public_demo/`](examples/public_demo/)
+- **Standalone Offline Diagnostic Demo**: [`examples/public_demo/`](examples/public_demo/README.md)
 - **Mathematical Specification & Taxonomy**: [`docs/methodology.md`](docs/methodology.md)
 - **Ecosystem Data Flow & Contracts**: [`docs/BENCHMARK_ECOSYSTEM.md`](docs/BENCHMARK_ECOSYSTEM.md)
 - **Cross-Repository Evidence Map**: [Ecosystem Evidence Flow](https://github.com/tmolavi/geo-scope/blob/main/docs/EVIDENCE_MAP.md)
 
 ## 📊 Benchmark & Reproducibility Protocol
 
-To prevent non-reproducible AI benchmark claims and account for evaluation stochasticity, SAGE enforces a formal statistical reproducibility pipeline (full specification: [`docs/reproducibility-protocol.md`](docs/reproducibility-protocol.md)):
+To prevent non-reproducible AI benchmark claims and account for evaluation stochasticity, SAGE enforces a formal statistical reproducibility pipeline (see [`docs/methodology.md`](docs/methodology.md)):
 
 - **Minimum $N \ge 20$ Repeated Runs**: Any public comparative claim requires at least 20 repeated runs (`--public-claim`), while fast single runs remain available for local development and CI testing.
 - **Statistical Rigor**: Computes 95% Wilson Score Confidence Intervals for success rates and 95% non-parametric bootstrap confidence intervals ($B=2000$) for latency. If confidence intervals overlap, claims of superiority are disallowed.
@@ -433,7 +433,7 @@ sage mcp                                        # اتصال به Claude Desktop
 
 ### 📊 پروتکل بازتولیدپذیری و بنچ‌مارک‌های آماری SAGE
 
-برای جلوگیری از ادعاهای غیرقابل اثبات و نوسانات تصادفی مدل‌های هوش مصنوعی، موتور SAGE به یک پروتکل استاندارد بازتولیدپذیری و اعتبارسنجی آماری مجهز است ([مستندات کامل در docs/reproducibility-protocol.md](docs/reproducibility-protocol.md)):
+برای جلوگیری از ادعاهای غیرقابل اثبات و نوسانات تصادفی مدل‌های هوش مصنوعی، موتور SAGE به یک روش استاندارد بازتولیدپذیری و اعتبارسنجی آماری مجهز است ([مستندات روش‌شناسی](docs/methodology.md)):
 
 - **حداقل ۲۰ تکرار برای ادعاهای عمومی (`--public-claim`)**: هرگونه ادعای مقایسه‌ای عمومی مستلزم حداقل ۲۰ بار اجرای تکراری مستقل است؛ در حالی که برای تست‌های سریع توسعه اجرای تک‌باره همچنان مجاز است.
 - **دقت آماری (فاصله‌های اطمینان ۹۵٪ ویلسون و بوت‌استرپ)**: نرخ موفقیت با فاصلهٔ اطمینان ۹۵٪ Wilson Score و توزیع تأخیر با فاصله اطمینان ۹۵٪ بوت‌استرپ ناپارامتریک محاسبه می‌شود. در صورت هم‌پوشانی بازه‌های اطمینان، برتری قاطعی اعلام نمی‌شود.
@@ -533,7 +533,7 @@ sage mcp                                               # Claude Desktop / Cursor
 
 ### 📊 SAGE Karşılaştırmalı Değerlendirme ve Yeniden Üretilebilirlik Protokolü
 
-Tek çalıştırmalı testlerdeki gürültüyü ve dayanaksız karşılaştırmalı iddiaları önlemek amacıyla SAGE, istatistiksel olarak doğrulanabilir bir değerlendirme hattı sunar ([ayrıntılı kılavuz: docs/reproducibility-protocol.md](docs/reproducibility-protocol.md)):
+Tek çalıştırmalı testlerdeki gürültüyü ve dayanaksız karşılaştırmalı iddiaları önlemek amacıyla SAGE, istatistiksel olarak doğrulanabilir bir değerlendirme hattı sunar ([ayrıntılı metodoloji](docs/methodology.md)):
 
 - **Kamuya Açık İddialar İçin Minimum 20 Tekrar (`--public-claim`)**: Karşılaştırmalı tüm kamu iddiaları en az 20 bağımsız çalıştırma gerektirir; yerel geliştirmede ise hızlı tek çalıştırmalar desteklenir.
 - **İstatistiksel Güven Aralıkları (%95 Wilson ve Bootstrap CI)**: Başarı oranı %95 Wilson Skor Güven Aralığı ile, gecikmeler ise parametrik olmayan bootstrap (%95 CI) ile hesaplanır. Güven aralıkları örtüşüyorsa kesin üstünlük ilan edilmez.
