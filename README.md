@@ -86,8 +86,39 @@ SAGE Audit operates as the static diagnostic component of the **Molavi AI Visibi
 - **Discovery**: [AnswerPath GEO](https://github.com/tmolavi/answerpath-geo)
 - **Measurement**: [GEO-Scope](https://github.com/tmolavi/geo-scope)
 - **Diagnostics**: [SAGE Audit](https://github.com/tmolavi/sage-audit) *(understand & diagnose)*
+- **Engine Intelligence**: [Molavi Web Intelligence Engine (MWIE)](https://github.com/tmolavi/molavi-web-intelligence) *(crawl, parse, citation probe & heal)*
 - **Action**: [SiteProbe](https://github.com/tmolavi/siteprobe) *(crawl & remediate)*
 - **Protocol**: [MCP GEO Server](https://github.com/tmolavi/mcp-geo-server)
+- **Interactive Tool**: [Molavi Web Intelligence Tool](https://molavi.pro/tools/web-intelligence)
+- **Enterprise Solutions**: [Inten Asia](https://inten.asia)
+
+### Citation Evidence & Offer Transparency Module
+Integrated with MWIE, SAGE audits citation evidence, quote density, verifiable empirical claims, and commercial offer transparency:
+
+```json
+{
+  "evidence_citability": {
+    "evidence_citability_score": 85,
+    "expert_quotes_count": 2,
+    "statistical_claims_count": 3,
+    "research_links_count": 2,
+    "research_domains": ["stanford.edu", "arxiv.org"],
+    "offer_transparency": {
+      "is_commercial_url": true,
+      "has_pricing_table": true,
+      "has_structured_deliverables": true,
+      "detected_currencies": ["$", "USD"],
+      "transparency_score": 100
+    },
+    "remediation_tips": [
+      "Embed attributed expert quotes (`<blockquote>`, `<q>`) to elevate domain authority.",
+      "Incorporate verifiable statistical claims, date-stamped figures, and primary research links (.edu, .org, arXiv)."
+    ]
+  }
+}
+```
+
+> Test online live across 5 languages at [https://molavi.pro/tools/web-intelligence](https://molavi.pro/tools/web-intelligence) or access consulting via [https://inten.asia](https://inten.asia).
 
 ## 📖 Runnable Python Example
 
